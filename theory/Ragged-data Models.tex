@@ -214,6 +214,31 @@ footskip=4ex
 	
 	
 	\section{Kees E. Bouwman, Jan P.A.M. Jacobs: "Forecasting with real-time macroeconomic data: the ragged-edge problem and revisions" (2005)}
+	
+	They claim that considering linear time series models ragged-edge data problem can be solved by the Kalman filter (Harvey (1989) and Hamilton (1994, Chapter 13)). They assume the following:
+	\begin{enumerate}
+		\item The maximum publication lag is equal to one month.
+		\item $x_1(t), t \in N$ is the vector of final values for period $t$ of the variables released without a publication lag.
+		\item $x_2(t), t \in N$ is the vector of final values for period $t$ of the variables released with an one-month publication lag.
+		\item The data becomes final by the end of the 5-month period since the first publication, so that there is a maximum of 5 data releases and 4 data revisions (updates) for a period. $x_k(i, t), k = 1, 2, i = 1, \dots, 5$ is the $i$-th release of the value $x_k$ for a period $t$. The release period of $x_k(i, t)$ is denoted by $\tau_k(i, t)$:
+		\[
+		\tau_1(i, t) = t + i,
+		\]
+		\[
+		\tau_2(i, t) = t + i + 1.
+		\]
+		
+		As the 5-th release is final, $x_k(t) \equiv x_k(5, t)$ and $\tau_k(t) \equiv \tau_k(5, t)$. 
+		\item A new vintage is released every month. All values in a vintage are given by their latest available release:
+		\[
+		x_1^T(t) = x(\min(T-t, 5), t) \forall t < T,
+		\]
+		\[
+		x_2^T(t) = x(\min(T-t-1, 5), t) \forall t < T-1,
+		\]
+		where $T$ is the vintage date.
+		\item \dots
+	\end{enumerate}
 
 	
 \end{document}
