@@ -215,12 +215,14 @@ footskip=4ex
 	
 	\section{Kees E. Bouwman, Jan P.A.M. Jacobs: "Forecasting with real-time macroeconomic data: the ragged-edge problem and revisions" (2005)}
 	
-	They claim that considering linear time series models ragged-edge data problem can be solved by the Kalman filter (Harvey (1989) and Hamilton (1994, Chapter 13)). They assume the following:
+	\subsection{Assumptions}
+	
+	They claim that, considering linear time series models, ragged-data problem can be solved by the Kalman filter (Harvey (1989) and Hamilton (1994, Chapter 13)). They assume the following:
 	\begin{enumerate}
 		\item The maximum publication lag is equal to one month.
 		\item $x_1(t), t \in N$ is the vector of final values for period $t$ of the variables released without a publication lag.
 		\item $x_2(t), t \in N$ is the vector of final values for period $t$ of the variables released with an one-month publication lag.
-		\item The data becomes final by the end of the 5-month period since the first publication, so that there is a maximum of 5 data releases and 4 data revisions (updates) for a period. $x_k(i, t), k = 1, 2, i = 1, \dots, 5$ is the $i$-th release of the value $x_k$ for a period $t$. The release period of $x_k(i, t)$ is denoted by $\tau_k(i, t)$:
+		\item The data becomes final by the end of the 5-month period since the first publication, so that there is a maximum of 5 data releases and 4 data revisions (updates) for a period. $x_k(i, t), k = 1, 2$, $ i = 1, \dots, 5$ is the $i$-th release of the value $x_k$ for a period $t$. The release period of $x_k(i, t)$ is denoted by $\tau_k(i, t)$:
 		\[
 		\tau_1(i, t) = t + i,
 		\]
@@ -231,14 +233,161 @@ footskip=4ex
 		As the 5-th release is final, $x_k(t) \equiv x_k(5, t)$ and $\tau_k(t) \equiv \tau_k(5, t)$. 
 		\item A new vintage is released every month. All values in a vintage are given by their latest available release:
 		\[
-		x_1^T(t) = x(\min(T-t, 5), t) \forall t < T,
+		x_1^T(t) = x(\min(T-t, 5), t) \, \forall t < T,
 		\]
 		\[
-		x_2^T(t) = x(\min(T-t-1, 5), t) \forall t < T-1,
+		x_2^T(t) = x(\min(T-t-1, 5), t) \, \forall t < T-1,
 		\]
 		where $T$ is the vintage date.
-		\item \dots
+		\item All the information available in period $T$ is represented by the information
+		set
+		\[
+		\Omega^T = \{ x_k(i, t) : \tau_k(i, t) \le T\},
+		\]
+		where $	t = 1, \dots, T-1$.
+		
+		They say that many forecast evaluations consider forecasts based on final data, which makes the information set to be the following:
+		\[
+		\tilde{\Omega}^T = \{ x_k(t) : \tau_k(1, t) \le T\}.
+		\]
+	
 	\end{enumerate}
 
-	
+\subsection{Modelling final data: TCB}
+
+They claim that to predict missing observations one has to specify the dynamics of the final data itself. To handle it they present the TCB procedure, which ignores data revisions and employs univariate AR(2) models on the levels for the imputation:
+
+\begin{align*}
+	\hat{x}_1(t | \Omega_T)  &= x_1^T(t), \hspace{3.86cm} t \le T-1, \\
+	\hat{x}_2(t | \Omega_T)  &= \begin{cases}
+	x_2^T(t), & t < T-1, \\
+	b + A_1 x_2^T(t-1) + A_2 x_2^T(t-2), & t = T-1,
+	\end{cases}
+\end{align*}
+where $A_1$ and $A_2$ are diagonal parameter matrices and $b$ is a parameter vector arising from modeling the components of $x_2$ separately by AR(2) models with a constant included. The parameter estimates can be obtained from historical data.
+
+\subsection{Modelling final data: Transformed Indicators}
+An alternative approach is to model the dynamics of the final data in terms of trans- formed indicators $r_k$ of $x_k$:
+\[
+r_k(t) = g_k(x_k(\cdot)), \, k = 1, 2.
+\]
+They assume a $p$-th order linear model:
+\[
+r(t) = b + A_1r(t-1) + \dots + A_pr(t-p) + \varepsilon(t),
+\]
+where $r(t) = \left(r_1(t)', r_2(t)'\right)'$ and $\varepsilon(t) \sim GWN(0, \Sigma_{\varepsilon})$.
+
+To put the model into the state-space form, they define a state vector as 
+\[
+\alpha(t) = \left( r(t)', \dots, r(t-p+1)' \right)'.
+\]
+
+Then the state-space form is given by the measurement equation:
+\[
+r(t) = \begin{bmatrix}
+I & 0 & \dots & 0
+\end{bmatrix} \alpha(t),
+\]
+and the transition equation:
+\[
+\alpha(t+1) = 
+\begin{bmatrix}
+A_1 & \dots & A_{p-1} & A_p \\
+I & \dots & 0 & 0 \\
+\vdots & \ddots & \vdots & \vdots \\
+0 & \dots & I & 0
+\end{bmatrix} \alpha(t) + 
+\begin{bmatrix}
+I \\
+0 \\
+\vdots \\
+0
+\end{bmatrix}b +
+\begin{bmatrix}
+I \\
+0 \\
+\vdots \\
+0
+\end{bmatrix}\varepsilon(t),
+\]
+where $I$ is the identity matrix. 
+They claim that the ragged edge can be smoothed by imputing the delayed observations of $r_2(t)$ with the Kalman filter.
+
+\subsection{Modelling final data: Alternative Models}
+They also mention alternative models:
+\begin{enumerate}
+	\item AR$(p)$: $A_1, \dots, A_p$ and $\Sigma_{\varepsilon}$ are restricted to be diagonal. The parameters are estimated by OLS for the individual AR(2) models. $\Sigma_{\varepsilon}$ is formed by the variances of the residuals of the individual equations.
+	\item SUR$(p)$: $A_1, \dots, A_p$ are restricted to be diagonal but no restrictions are imposed on $\Sigma_{\varepsilon}$. The parameters are estimated by the Seemingly Unrelated Regression procedure.
+	\item VAR$(p)$:  $A_1, \dots, A_p$ and $\Sigma_{\varepsilon}$ are all free. Parameters are estimated by OLS for the individual equations. $\Sigma_{\varepsilon}$ is estimated from the residuals.
+\end{enumerate}
+
+\subsection{Modelling final data: Adjusting for Data Revisions}
+They say that one approach to consider is to ignore revision errors at all and make a naive prediction based on the last available data vintage:
+\[
+\hat{x}_k(t | \Omega^T) = x_k^T(t) \text{ for } t \le T - k.
+\]
+
+Another approach takes data revisions into account. They claim that given the observed provisional values a typical model yields the conditional distribution of the unobserved final values. From these densities one can derive the Minimum Mean Squared Error predictions of the final values:
+\[
+\hat{x}_k(t | \Omega^T) = E(x_k(t) | \Omega^T) \text{ for } t \le T - 1.
+\]
+
+Next, they consider the extension of the state-space model, which will take into account data revisions. The measurement error model they consider assumes that preliminary values are final values contaminated with an additive measurement error, which follows a GWN process. Under this assumption, the final state-space model looks as following: the transition equation from above remains unchanged, whereas the measurement equation becomes:
+\[
+y(t) = 
+\begin{pmatrix}
+\i \, \otimes \, 
+\begin{bmatrix}
+I & 0 & \dots & 0
+\end{bmatrix}
+\end{pmatrix} \alpha(t) + 
+\begin{pmatrix}
+\begin{bmatrix}
+1 & 1 & 1 & 1 \\
+0 & 1 & 1 & 1 \\
+0 & 0 & 1 & 1 \\
+0 & 0 & 0 & 1 \\
+0 & 0 & 0 & 0
+\end{bmatrix} \otimes I
+\end{pmatrix} v(t),
+\]
+where
+
+$y(t) = \left(r(1,t)', \dots r(5,t)' \right)'$,
+
+$\i$ is the unit vector of length 5,
+
+$v(t)$ is the vector of revision errors:
+\[
+v(t) = \begin{pmatrix}
+u(1, t) \\
+\vdots \\
+u(4, t)
+\end{pmatrix},
+\]
+\[
+u(i, t) = r(i, t) - r(i + 1, t), \text{ for } i = 1, \dots, 4.
+\]
+Moreover, if $\eta_j(t) = (u_j(1, t), \dots, u_j(4, t))'$, the revision model assumes:
+\[
+\eta_j \sim GWN(0, \Sigma_{\eta j}),
+\]
+\[
+E(\eta_j(t), \eta_k(t)') = 0 \text{ for } j \ne k,
+\]
+\[
+E(\eta_j(t), \varepsilon(t)') = 0,
+\]
+which yields the following variance-covariance matrix of the revision errors:
+\[
+E(v(t),v(t)') = K_{10, 4} \begin{pmatrix}
+\Sigma_{\eta, 1} & \, & 0 \\
+\, & \ddots & \, \\
+0 & \, & \Sigma_{\eta, 10}
+\end{pmatrix} K_{4, 10},
+\]
+where $K_{m, n}$ is the commutation matrix: $K_{m,n} \text{ vec } A = \text{ vec } A'$ for an arbitrary $(m \times n)$-matrix $A$.
+
+Returning to the model, again, the Kalman filter can be used to impute the delayed observations $r_2(t)$.
+
 \end{document}
