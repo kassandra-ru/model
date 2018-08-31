@@ -1,0 +1,80 @@
+# install dev packages ----------------------------------------------------
+
+# devtools::install_github("tidyverts/fable")
+
+
+# load packages -----------------------------------------------------------
+
+library(tidyverse)
+library(rio)
+library(tsibble)
+library(fable)
+library(forecast)
+library(lubridate)
+
+Sys.setlocale("LC_TIME", "C")
+
+# load data ---------------------------------------------------------------
+
+cpi = import("data_snapshot/cpi_inflation.csv")
+gdp = import("data_snapshot/gdp.csv")
+
+rus_m = import("data_snapshot/russia_monthly.csv")
+rus_m_info = import("data_snapshot/russia_monthly_info.csv")
+
+rus_q = import("data_snapshot/russia_quarterly.csv")
+rus_q_info = import("data_snapshot/russia_quarterly_info.csv")
+
+
+# manually expect data ----------------------------------------------------
+
+tail(cpi)
+head(cpi)
+glimpse(cpi)
+
+tail(gdp)
+head(gdp)
+glimpse(gdp)
+
+tail(rus_m)
+head(rus_m)
+glimpse(rus_m)
+
+tail(rus_q)
+head(rus_q)
+glimpse(rus_q)
+
+# data cleanup ------------------------------------------------------------
+
+# better variable names
+
+# character to dates
+# standartize dates to yyyy-mm-dd
+
+
+colnames(rus_q) = c("date", "gdp_nominal", "gdp_index", "household", "export", "import", "cpi", "ppi",
+                    "reer", "ir", "public_expen", "m2", "reserves", "oil_inc", "population2", 
+                    "real_wage", "employment", "population", "bicurrency", "y_real", "y_sa", "y_percap",
+                    "y_index", "c_real", "c_sa", "c_percap", "c_index", "cpi_inflation", 
+                    "reer_us", "reer_euro", "reer_weight", "bal_percap", "m_index", "infl_domestic",
+                    "real_wage_sa", "oil_inc_alt", "oil_inc_percap", "oil_inc_alt2")
+
+colnames(rus_m) = c("date", "empl_manuf", "ind_prod", "cpi_index", "ib_rate", "lend_rate", 
+                    "real_income", "unempl", "ppi_index", "constr_nat", "inv_realcap", "real_wage",
+                    "m2", "rts_index", "reer_cpi", "gas_price", "trade_balance", "reserves_nongold", 
+                    "exch_rate_us", "worker_demand", "agric_index", 
+                    "retail_index", "budget", "export", "import")
+
+cpi = mutate(cpi, date = yearmonth(date))
+gdp = mutate(cpi, date = yearquarter(date))
+
+rus_m = mutate(rus_m, date = yearmonth(date)) 
+rus_q = mutate(rus_q, date = yearquarter(yq(date))) 
+
+
+glimpse(rus_q)
+glimpse(rus_m)
+
+
+
+
