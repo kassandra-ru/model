@@ -95,14 +95,12 @@ rus_m = filter(rus_m, date >= ymd("2000-01-01"))
 fable_cpi_arima = rus_m %>% ARIMA(value) %>% forecast(h = 6)
 fable_cpi_ets = rus_m %>% ETS(value) %>% forecast(h = 6)
 
-fable_cpi_arima$forecast[[1]] %>% autoplot()
-fable_cpi_ets$forecast[[1]] %>% autoplot()
+fable_cpi_arima %>% autoplot
+fable_cpi_ets %>% autoplot
+
 
 fable_cpi_arima$forecast[[1]] %>% .$mean
 fable_cpi_ets$forecast[[1]] %>% .$mean
-
-fable_cpi_arima %>% autoplot
-fable_cpi_ets %>% autoplot
 
 
 rus_m2 = filter(rus_m, date >= ymd("2011-10-01"))
@@ -110,19 +108,17 @@ rus_m2 = filter(rus_m, date >= ymd("2011-10-01"))
 fable_cpi_arima = rus_m2 %>% ARIMA(value) %>% forecast(h = 6)
 fable_cpi_ets = rus_m2 %>% ETS(value) %>% forecast(h = 6)
 
-fable_cpi_arima$forecast[[1]] %>% autoplot()
-fable_cpi_ets$forecast[[1]] %>% autoplot()
+fable_cpi_arima %>% autoplot()
+fable_cpi_ets %>% autoplot()
 
 fable_cpi_arima$forecast[[1]] %>% .$mean
 fable_cpi_ets$forecast[[1]] %>% .$mean
 
-fable_cpi_arima %>% autoplot
-fable_cpi_ets %>% autoplot
-
 cpi_value = ts(rus_m2$value, freq = 12, start = c(2011, 10))
 cpi_tbats = cpi_value %>% tbats() 
 cpi_tbats_forecast = cpi_tbats %>% forecast(h = 6)
-autoplot(cpi_tbats)
+cpi_tbats_forecast
+autoplot(cpi_tbats_forecast)
 
 
 
