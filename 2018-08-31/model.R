@@ -3,7 +3,7 @@
 # devtools::install_github("tidyverts/fable")
 
 
-# load packages -----------------------------------------------------------
+# attach packages -----------------------------------------------------------
 
 library(tidyverse)
 library(rio)
@@ -46,11 +46,15 @@ glimpse(rus_q)
 
 # data cleanup ------------------------------------------------------------
 
+# remove NA and duplicates by coincidence :)
+
 # better variable names
 
 # character to dates
 # standartize dates to yyyy-mm-dd
 
+rus_q = na.omit(rus_q)
+rus_m = na.omit(rus_m)
 
 colnames(rus_q) = c("date", "gdp_nominal", "gdp_index", "household", "export", "import", "cpi", "ppi",
                     "reer", "ir", "public_expen", "m2", "reserves", "oil_inc", "population2", 
@@ -66,7 +70,7 @@ colnames(rus_m) = c("date", "empl_manuf", "ind_prod", "cpi_index", "ib_rate", "l
                     "retail_index", "budget", "export", "import")
 
 cpi = mutate(cpi, date = yearmonth(date))
-gdp = mutate(cpi, date = yearquarter(date))
+gdp = mutate(gdp, date = yearquarter(date))
 
 rus_m = mutate(rus_m, date = yearmonth(date)) 
 rus_q = mutate(rus_q, date = yearquarter(yq(date))) 
@@ -75,6 +79,16 @@ rus_q = mutate(rus_q, date = yearquarter(yq(date)))
 glimpse(rus_q)
 glimpse(rus_m)
 
+rus_m = left_join(cpi, rus_m, by = "date")
+rus_q = left_join(gdp, rus_q, by = "date")
+
+rus_m = as_tsibble(rus_m, index = date)
+rus_q = as_tsibble(rus_q, index = date)
+
+# univariate models -------------------------------------------------------
+
+fable_cpi_arima = rus_m %>% ARIMA(value) %>% forecast(h = 6)
+fable_cpi_ets = rus_m %>% ETS(value) %>% forecast(h = 6)
 
 
 
