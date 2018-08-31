@@ -121,4 +121,34 @@ cpi_tbats_forecast
 autoplot(cpi_tbats_forecast)
 
 
+# gdp univariate models -------------------------------------------------------
 
+rus_q = filter(rus_q, date >= ymd("2000-01-01"))
+
+fable_gdp_arima = rus_q %>% ARIMA(value) %>% forecast(h = 3)
+fable_gdp_ets = rus_q %>% ETS(value) %>% forecast(h = 3)
+
+fable_gdp_arima %>% autoplot
+fable_gdp_ets %>% autoplot
+
+
+fable_gdp_arima$forecast[[1]] %>% .$mean
+fable_gdp_ets$forecast[[1]] %>% .$mean
+
+
+rus_q2 = filter(rus_q, date >= ymd("2011-10-01"))
+
+fable_gdp_arima = rus_q2 %>% ARIMA(value) %>% forecast(h = 3)
+fable_gdp_ets = rus_q2 %>% ETS(value) %>% forecast(h = 3)
+
+fable_gdp_arima %>% autoplot()
+fable_gdp_ets %>% autoplot()
+
+fable_gdp_arima$forecast[[1]] %>% .$mean
+fable_gdp_ets$forecast[[1]] %>% .$mean
+
+gdp_value = ts(rus_q2$value, freq = 4, start = c(2011, 4))
+gdp_tbats = gdp_value %>% tbats() 
+gdp_tbats_forecast = gdp_tbats %>% forecast(h = 3)
+gdp_tbats_forecast
+autoplot(gdp_tbats_forecast)
