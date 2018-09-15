@@ -5,12 +5,13 @@
 
 # attach packages -----------------------------------------------------------
 
-library(tidyverse)
-library(rio)
-library(tsibble)
-library(fable)
-library(forecast)
-library(lubridate)
+library(tidyverse) # data manipulation
+library(rio) # import - export data
+library(tsibble) # ts data frames
+library(fable) # forecasting models
+library(forecast) # forecasting models
+library(lubridate) # working with dates
+library(glmnet) # lasso
 
 Sys.setlocale("LC_TIME", "C")
 
@@ -88,6 +89,16 @@ rus_q = mutate(rus_q, date = yearquarter(date))
 rus_m = as_tsibble(rus_m, index = date)
 rus_q = as_tsibble(rus_q, index = date)
 
+
+
+# plots -------------------------------------------------------------------
+head(rus_m)
+
+rus_m_ts = ts(rus_m$value, frequency = 12, start = )
+
+autoplot(rus_m %>% select(date, value))
+seasonplot()
+
 # cpi univariate models -------------------------------------------------------
 
 rus_m = filter(rus_m, date >= ymd("2000-01-01"))
@@ -152,3 +163,8 @@ gdp_tbats = gdp_value %>% tbats()
 gdp_tbats_forecast = gdp_tbats %>% forecast(h = 3)
 gdp_tbats_forecast
 autoplot(gdp_tbats_forecast)
+
+
+# cpi lasso ---------------------------------------------------------------
+
+
