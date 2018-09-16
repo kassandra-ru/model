@@ -114,46 +114,56 @@ vis_miss(rus_q_full)
 
 # cpi univariate models -------------------------------------------------------
 
-rus_m1 = filter(rus_m_full, date >= ymd("2000-01-01"))
+start_date = ymd("2011-10-01")
 
-fable_cpi1_arima = rus_m1 %>% ARIMA(value) %>% forecast(h = 6)
-fable_cpi1_ets = rus_m1 %>% ETS(value) %>% forecast(h = 6)
-
-# fable_cpi1_arima %>% autoplot
-# fable_cpi1_ets %>% autoplot
+rus_m_full_stable = filter(rus_m_full, date >= start_date)
 
 
-# fable_cpi1_arima$forecast[[1]] %>% .$mean
-# fable_cpi1_ets$forecast[[1]] %>% .$mean
+cpi_value = ts(rus_m_full_stable$value, freq = 12, start = c(year(start_date), month(start_date)))
+
+tbats_model = cpi_value %>% tbats() 
+ets_model = cpi_value %>% ets()
+arima_model = Arima(cpi_value)
+arima_11_11_model = Arima(cpi_value, order = c(1, 0, 1), seasonal = c(1, 0, 1))
 
 
-rus_m2 = filter(rus_m_full, date >= ymd("2011-10-01"))
 
-fable_cpi2_arima = rus_m2 %>% ARIMA(value) %>% forecast(h = 6)
-fable_cpi2_ets = rus_m2 %>% ETS(value) %>% forecast(h = 6)
+cpi_tbats_forecast = tbats_model %>% forecast(h = 6)
+cpi_arima_forecast = arima_model %>% forecast(h = 6)
+cpi_arima_11_11_forecast = arima_11_11_model %>% forecast(h = 6)
+cpi_ets_forecast = ets_model %>% forecast(h = 6)
 
-# fable_cpi2_arima %>% autoplot()
-# fable_cpi2_ets %>% autoplot()
-
-# fable_cpi2_arima$forecast[[1]] %>% .$mean
-# fable_cpi2_ets$forecast[[1]] %>% .$mean
-
-cpi2_value = ts(rus_m2$value, freq = 12, start = c(2011, 10))
-cpi2_tbats = cpi2_value %>% tbats() 
-
-cpi2_arima = Arima(y = cpi2_value, order = c(2, 0, 0), seasonal = c(2, 0, 0))
-cpi2_ets = cpi2_value %>% ets()
-
-
-cpi_tbats_forecast = cpi2_tbats %>% forecast(h = 6)
-cpi_arima_forecast = cpi2_arima %>% forecast(h = 6)
-cpi_ets_forecast = cpi2_ets %>% forecast(h = 6)
 
 cpi_ets_forecast
 cpi_arima_forecast
+cpi_arima_11_11_forecast
 cpi_tbats_forecast
-autoplot(cpi_tbats_forecast)
 
+
+
+# cpi cross validation --------------------------------------------------
+
+# input: rus_m_full_stable
+
+
+train_proportion = 0.8
+window_type = "moving" # "moving" or "growing"
+
+nobs_full = nrow(rus_m_full_stable)
+starting_window_length = round(train_proportion * nobs_full)
+
+
+cv_model = tibble(last_included_obs = starting_window_length:nobs_full)
+if (window_type == "moving") {
+  cv_model = mutate(cv_model, first_included_obs = last_included_obs - starting_window_length + 1)
+} else {
+  cv_model = mutate(cv_model, first_included_obs = 1)
+}
+
+# cv_model = mutate(cv_model, data = map2(first_included_obs, last_included_obs, 
+#                                       rus_m_full_stable[.x:.y, ]))
+
+?map
 
 # gdp univariate models -------------------------------------------------------
 
@@ -186,52 +196,6 @@ gdp_tbats = gdp2_value %>% tbats()
 gdp_tbats_forecast = gdp_tbats %>% forecast(h = 3)
 gdp_tbats_forecast
 autoplot(gdp_tbats_forecast)
-
-
-# cpi lasso ---------------------------------------------------------------
-
-
-tail(rus_m2, 12)
-y = rus_m2[, "value"] %>% tail(-1) 
-X = rus_m2[, 1:8] %>% head(-1) 
-y_matrix = as.matrix(y)
-
-X_fourier = fourier(head(cpi2_value, -1), 6)
-nobs_train = nrow(X)
-X_trend = cbind(1:nobs_train, sqrt(1:nobs_train))
-colnames(X_trend) = c("t", "sqrt_t")
-
-X_matrix = cbind(as.matrix(X), X_fourier, X_trend)
-
-lasso_lag_1 = cv.glmnet(X_matrix, y_matrix)
-lasso_lag_1
-
-X_future_variables = rus_m2[, 1:8] %>% tail(1) 
-
-X_fourier_future = fourier(head(cpi2_value, -1), 6, h = 1)
-X_trend_future = cbind(sqrt(nobs_train + 1), sqrt(nobs_train + 1))
-colnames(X_trend_future) = c("t", "sqrt_t")
-
-X_future_matrix = cbind(as.matrix(X_future_variables), X_fourier_future, X_trend_future)
-predict(lasso_lag_1, X_future_matrix, s = "lambda.1se")
-
-coef(lasso_lag_1, s = "lambda.1se")
-coef(lasso_lag_1, s = "lambda.min")
-
-
-# cpi ranger - random forest --------------------------------------------------
-colnames(y) = "y"
-yX = as_tibble(cbind(y, X_matrix))
-glimpse(yX)
-colnames(yX)[10:20] = paste0("fourier_", 1:11)
-
-X_future = as_tibble(X_future_matrix)
-colnames(X_future)[9:19] = paste0("fourier_", 1:11)
-
-glimpse(X_future)
-model = ranger(data = yX, y ~ .)
-forest_pred = predict(model, data = X_future)
-forest_pred$predictions
 
 
 # make augmented tsibble ------------------------------------------------------------
@@ -286,7 +250,7 @@ add_lags = function(original, variable, lags = c(1, 2)) {
 
 
 # works for many quoted variables
-add_lags_ = function(original, variable_names, lags = c(1, 2)) {
+add_lags2 = function(original, variable_names, lags = c(1, 2)) {
   for (variable_name in variable_names) {
     for (lag in lags) {
       new_variable_name = paste0("lag", lag, "_", variable_name)
@@ -308,10 +272,82 @@ get_last_date = function(original) {
 }
 
 
-add_n_rows = function(original, n = 1) {
+add_n_rows = function(original, n = 1, frequency = 12) {
   nobs = nrow(original)
   original_plus_one_row = add_row(original)
   augmented = original_plus_one_row[c(1:nobs, rep(nobs + 1, n)), ]
+  
+  # date_variable = index(original)
+  date = pull(original, "date") 
+  date = date %>% as.Date()
+  
+  if (frequency == 12) {
+    future_date = tail(date, 1) + months(1:n)
+    new_date = c(date, future_date)
+    augmented = mutate(augmented, date = yearmonth(new_date))
+  } else if (frequency == 4) {
+    future_date = tail(date, 1) + months(1:n)
+    new_date = c(date, future_date)    
+    augmented = mutate(augmented, date = yearquarter(new_date))
+  }
   return(augmented)
 }
+
+
+
+
+# forecast for h using lasso ----------------------------------------------------------
+
+
+augment_tsibble_4_regression = function(original, h = 1, frequency = 12) {
+  augmented = original %>% append_row(n = h) %>% 
+    add_trend() %>% add_fourier() %>% 
+    add_lags(value, lags = c(h, h + 1, frequency, frequency + 1))
+  regressor_names = setdiff(colnames(original), c("value", "date"))
+  augmented = augmented %>% add_lags2(regressor_names, lags = c(h, h + 1, frequency, frequency + 1))
+  augmented = augmented %>% select(-!!regressor_names)
+  return(augmented)
+}
+
+lasso_forecast = function(augmented, s = c("lambda.min", "lambda.1se")) {
+  s = match.arg(s)
+  
+  yX_future_tsibble = tail(augmented, 1)
+  X_future = as_tibble(yX_future_tsibble) %>% select(-value, -date) %>% as.matrix()
+
+  yX_tsibble = na.omit(augmented)
+  y = yX_tsibble %>% pull("value")
+  X = as_tibble(yX_tsibble) %>% select(-value, -date) %>% as.matrix()
+
+  lasso_model = cv.glmnet(X, y)
+  point_forecast = predict(lasso_model, X_future, s = s)
+  return(point_forecast)
+}
+
+ranger_forecast = function(augmented, seed = 777) {
+  yX_future_tsibble = tail(augmented, 1)
+
+  yX_tsibble = na.omit(augmented)
+
+  set.seed(seed)
+  ranger_model = ranger(data = yX_tsibble, value ~ . - date)
+  ranger_pred = predict(ranger_model, data = yX_future_tsibble)
+  point_forecast = ranger_pred$predictions
+  
+  return(point_forecast)
+}
+
+rus_augmented = augment_tsibble_4_regression(rus_m_full, h = 1)
+
+
+lasso_forecast(rus_augmented)
+ranger_forecast(rus_augmented)
+
+
+
+
+
+
+
+
 
