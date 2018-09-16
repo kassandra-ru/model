@@ -272,29 +272,6 @@ get_last_date = function(original) {
 }
 
 
-add_n_rows = function(original, n = 1, frequency = 12) {
-  nobs = nrow(original)
-  original_plus_one_row = add_row(original)
-  augmented = original_plus_one_row[c(1:nobs, rep(nobs + 1, n)), ]
-  
-  # date_variable = index(original)
-  date = pull(original, "date") 
-  date = date %>% as.Date()
-  
-  if (frequency == 12) {
-    future_date = tail(date, 1) + months(1:n)
-    new_date = c(date, future_date)
-    augmented = mutate(augmented, date = yearmonth(new_date))
-  } else if (frequency == 4) {
-    future_date = tail(date, 1) + months(1:n)
-    new_date = c(date, future_date)    
-    augmented = mutate(augmented, date = yearquarter(new_date))
-  }
-  return(augmented)
-}
-
-
-
 
 # forecast for h using lasso ----------------------------------------------------------
 
