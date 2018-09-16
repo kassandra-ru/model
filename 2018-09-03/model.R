@@ -225,16 +225,6 @@ add_trend = function(original) {
   return(augmented)
 }
 
-# проще написать
-# %>% mutate(new_var = lead(old_var, 5))
-# а вообще она не нужна:
-# просто честно добавляем лаги исходной и вперед!!!
-shift_variable = function(original, variable, h = 1) {
-  variable = enquo(variable)
-  variable_name = quo_name(variable)
-  augmented = mutate(original, !!variable_name := lead(!!variable, h))
-  return(augmented)
-}
 
 
 # works only for one variable (without quotes)
