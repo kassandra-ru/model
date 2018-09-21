@@ -141,29 +141,135 @@ cpi_tbats_forecast
 
 
 
-# cpi cross validation --------------------------------------------------
 
-# input: rus_m_full_stable
+# cpi quality evaluation --------------------------------------------------
 
 
-train_proportion = 0.8
-window_type = "moving" # "moving" or "growing"
+
+proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
 
 nobs_full = nrow(rus_m_full_stable)
-starting_window_length = round(train_proportion * nobs_full)
+nobs_test = round(proportion_test * nobs_full)
+
+window_type = "sliding" # "sliding" or "stretching" as in tsibble
 
 
-cv_model = tibble(last_included_obs = starting_window_length:nobs_full)
-if (window_type == "moving") {
-  cv_model = mutate(cv_model, first_included_obs = last_included_obs - starting_window_length + 1)
-} else {
-  cv_model = mutate(cv_model, first_included_obs = 1)
+dates_test = tail(rus_m_full_stable$date, nobs_test)
+
+
+
+h_all = 1:6
+model_funs_all = c("ets_fun", "tbats_fun", "arima_fun", "arima11_fun")
+
+# model should take: h, model_sample (multivariate tsibble)
+# produce some model :)
+# may ignore h
+
+extract_value = function(model_sample) {
+  y = model_sample %>% select(value) %>% as.ts()
+  return(y)
 }
 
-# cv_model = mutate(cv_model, data = map2(first_included_obs, last_included_obs, 
-#                                       rus_m_full_stable[.x:.y, ]))
+ets_fun = function(model_sample, h) {
+  # h is ignored!
+  y = extract_value(model_sample)
+  model = ets(y)
+  return(model)
+}
 
-?map
+
+arima_fun = function(model_sample, h) {
+  # h is ignored!
+  y = extract_value(model_sample)
+  model = Arima(y)
+  return(model)
+}
+
+arima11_fun = function(model_sample, h) {
+  # h is ignored!
+  y = extract_value(model_sample)
+  model = Arima(y, order = c(1, 0, 1), seasonal = c(1, 0, 1))
+  return(model)
+}
+
+tbats_fun = function(model_sample, h) {
+  # h is ignored!
+  y = extract_value(model_sample)
+  model = tbats(y)
+  return(model)
+}
+
+
+
+
+
+cv_results = crossing(date = dates_test, h = h_all, model_fun = model_funs_all)
+cv_results
+
+
+cv_results = left_join(cv_results, select(rus_m_full, value), by = "date")
+
+
+ymd("2014-12-05") - months(1)
+
+
+cv_results = mutate(cv_results, train_end_date = date - months(h))
+
+full_sample_start_date = min(rus_m_full_stable$date)
+test_sample_start_date = min(cv_results$date)
+window_min_length = round(interval(full_sample_start_date, test_sample_start_date) /  months(1)) - max(h_all) + 1
+
+
+if (window_type == "stretching") {
+  cv_results = mutate(cv_results, train_start_date = min(pull(rus_m_full, date)))
+} else {
+  # sliding window case
+  cv_results = mutate(cv_results, train_start_date = train_end_date - months(window_min_length - 1))
+}
+
+cv_results = mutate(cv_results, 
+      train_sample = pmap(list(x = train_start_date, y = train_end_date), 
+            ~ filter(rus_m_full_stable, date >= .x, date <= .y)))
+
+
+# we estimate some models only with maximal h -----------------------------------
+h_agnostic_model_funs = c("arima_fun", "ets_fun", "arima11_fun", "tbats_fun")
+
+cv_results = cv_results %>% group_by(model_fun, train_end_date, train_start_date) %>%
+  mutate(duplicate_model = (model_fun %in% h_agnostic_model_funs) & (h < max(h_all))) %>% ungroup()
+
+
+
+# models in tibble version ------------------------------------------------
+
+
+cv_res_models = cv_results %>% filter(!duplicate_model) %>%
+  mutate(
+  fitted_model = pmap(list(train_sample, h, model_fun), 
+                      ~ do.call(..3, list(h = ..2, model_sample = ..1))
+                               ))
+
+write_rds(cv_results, "cv_res_models.Rds")
+
+
+
+# fill duplicate models ---------------------------------------------------
+
+right_tibble = cv_res_models %>% filter(h == max(h_all)) %>%
+  select(model_fun, train_start_date, train_end_date, fitted_model) 
+
+cv_duplicate_models = left_join(cv_results %>% filter(duplicate_model), right_tibble, 
+        by = c("model_fun", "train_start_date", "train_end_date"))
+
+cv_results_new = bind_rows(cv_res_models, cv_duplicate_models)
+
+
+# add forecasts... --------------------------------------------------------
+
+cv_results = cv_results %>% mutate(forecast = pmap(list(fitted_model, h, model_fun), 
+                                                   ~ get_forecast(fitted_model, h, model_fun)))
+
+
 
 # gdp univariate models -------------------------------------------------------
 
