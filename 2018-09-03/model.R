@@ -144,7 +144,7 @@ cpi_tbats_forecast
 
 # cpi quality evaluation --------------------------------------------------
 
-
+# TODO: rename test to eval
 
 proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
 
@@ -159,7 +159,7 @@ dates_test = tail(rus_m_full_stable$date, nobs_test)
 
 
 h_all = 1:6
-model_funs_all = c("ets_fun", "tbats_fun", "arima_fun", "arima11_fun")
+
 
 # model should take: h, model_sample (multivariate tsibble)
 # produce some model :)
@@ -199,23 +199,41 @@ tbats_fun = function(model_sample, h) {
   return(model)
 }
 
+forecast_2_scalar = function(forecast_object, h = 1) {
+  y_hat = forecast_object$mean[h]
+  return(y_hat)
+}
+
+uni_model_2_scalar_forecast = function(model, h = 1, regressors = NULL) {
+  forecast_object = forecast(model, h = h)
+  y_hat = forecast_2_scalar(forecast_object)
+  return(y_hat)
+}
+
+
+model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
+                          "ets_fun", TRUE, "uni_model_2_scalar_forecast",
+                          "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
+                          "arima_fun", TRUE, "uni_model_2_scalar_forecast",
+                          "arima11_fun", TRUE, "uni_model_2_scalar_forecast") #,
+#                          "lasso_fun", FALSE, "lasso_2_scalar_forecast",
+#                          "ranger_fun", FALSE, "ranger_2_scalar_forecast")
+                          
 
 
 
-
-cv_results = crossing(date = dates_test, h = h_all, model_fun = model_funs_all)
+cv_results = crossing(date = dates_test, h = h_all, model_fun = model_fun_tibble$model_fun)
 cv_results
 
 
 cv_results = left_join(cv_results, select(rus_m_full, value), by = "date")
 
 
-ymd("2014-12-05") - months(1)
-
 
 cv_results = mutate(cv_results, train_end_date = date - months(h))
 
 full_sample_start_date = min(rus_m_full_stable$date)
+full_sample_last_date = max(rus_m_full_stable$date)
 test_sample_start_date = min(cv_results$date)
 window_min_length = round(interval(full_sample_start_date, test_sample_start_date) /  months(1)) - max(h_all) + 1
 
@@ -233,11 +251,11 @@ cv_results = mutate(cv_results,
 
 
 # we estimate some models only with maximal h -----------------------------------
-h_agnostic_model_funs = c("arima_fun", "ets_fun", "arima11_fun", "tbats_fun")
 
-cv_results = cv_results %>% group_by(model_fun, train_end_date, train_start_date) %>%
-  mutate(duplicate_model = (model_fun %in% h_agnostic_model_funs) & (h < max(h_all))) %>% ungroup()
-
+cv_results = left_join(cv_results,  model_fun_tibble, by = "model_fun")
+                       
+cv_results = cv_results %>% group_by(train_end_date, train_start_date, model_fun) %>%
+  mutate(duplicate_model = h_agnostic & (h < max(h))) %>% ungroup()
 
 
 # models in tibble version ------------------------------------------------
@@ -255,10 +273,12 @@ write_rds(cv_results, "cv_res_models.Rds")
 
 # fill duplicate models ---------------------------------------------------
 
-right_tibble = cv_res_models %>% filter(h == max(h_all)) %>%
+right_tibble = cv_res_models %>% filter(h_agnostic) %>%
   select(model_fun, train_start_date, train_end_date, fitted_model) 
 
-cv_duplicate_models = left_join(cv_results %>% filter(duplicate_model), right_tibble, 
+cv_duplicate_models_wo_fitted = cv_results %>% filter(duplicate_model)
+
+cv_duplicate_models = left_join(cv_duplicate_models_wo_fitted, right_tibble, 
         by = c("model_fun", "train_start_date", "train_end_date"))
 
 cv_results_new = bind_rows(cv_res_models, cv_duplicate_models)
@@ -266,8 +286,6 @@ cv_results_new = bind_rows(cv_res_models, cv_duplicate_models)
 
 # add forecasts... --------------------------------------------------------
 
-cv_results = cv_results %>% mutate(forecast = pmap(list(fitted_model, h, model_fun), 
-                                                   ~ get_forecast(fitted_model, h, model_fun)))
 
 
 
@@ -396,6 +414,10 @@ lasso_forecast = function(augmented, s = c("lambda.min", "lambda.1se")) {
   point_forecast = predict(lasso_model, X_future, s = s)
   return(point_forecast)
 }
+
+
+
+
 
 ranger_forecast = function(augmented, seed = 777) {
   yX_future_tsibble = tail(augmented, 1)
