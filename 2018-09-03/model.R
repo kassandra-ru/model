@@ -204,7 +204,8 @@ forecast_2_scalar = function(forecast_object, h = 1) {
   return(y_hat)
 }
 
-uni_model_2_scalar_forecast = function(model, h = 1, regressors = NULL) {
+uni_model_2_scalar_forecast = function(model, h = 1, regressors_forecast = NULL) {
+  # regressors_forecast is unused in univariate models
   forecast_object = forecast(model, h = h)
   y_hat = forecast_2_scalar(forecast_object)
   return(y_hat)
@@ -286,7 +287,11 @@ cv_results_new = bind_rows(cv_res_models, cv_duplicate_models)
 
 # add forecasts... --------------------------------------------------------
 
-
+cv_results_new = mutate(cv_results_new, regressors_forecast = NA) 
+cv_results_new = mutate(cv_results_new, 
+     point_forecast = pmap(list(fitted_model, h, regressors_forecast, forecast_extractor), 
+                        ~ do.call(..4, list(model = ..1, h = ..2, regressors_forecast = ..3))
+                        ))
 
 
 # gdp univariate models -------------------------------------------------------
