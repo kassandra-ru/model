@@ -289,10 +289,13 @@ cv_results_new = bind_rows(cv_res_models, cv_duplicate_models)
 
 cv_results_new = mutate(cv_results_new, regressors_forecast = NA) 
 cv_results_new = mutate(cv_results_new, 
-     point_forecast = pmap(list(fitted_model, h, regressors_forecast, forecast_extractor), 
+     point_forecast = pmap_dbl(list(fitted_model, h, regressors_forecast, forecast_extractor), 
                         ~ do.call(..4, list(model = ..1, h = ..2, regressors_forecast = ..3))
                         ))
-
+mae_table = cv_results_new %>% select(h, model_fun, value, point_forecast) %>%
+  mutate(abs_diff = abs(value - point_forecast))  %>%
+  group_by(h, model_fun) %>% summarise(mae = mean(abs_diff))
+mae_table
 
 # gdp univariate models -------------------------------------------------------
 
