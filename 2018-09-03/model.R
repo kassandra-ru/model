@@ -204,21 +204,168 @@ forecast_2_scalar = function(forecast_object, h = 1) {
   return(y_hat)
 }
 
-uni_model_2_scalar_forecast = function(model, h = 1, regressors_forecast = NULL) {
-  # regressors_forecast is unused in univariate models
+uni_model_2_scalar_forecast = function(model, h = 1, model_sample = NA) {
+  # model_sample is unused in univariate models
   forecast_object = forecast(model, h = h)
-  y_hat = forecast_2_scalar(forecast_object)
+  y_hat = forecast_2_scalar(forecast_object, h = h)
   return(y_hat)
 }
 
 
+# make augmented tsibble ------------------------------------------------------------
+
+# input: tsibble
+# output: tsibble
+
+
+add_fourier = function(original, K_fourier = Inf) {
+  original_ts = as.ts(original)
+  freq = frequency(original)
+  K_fourier = min(floor(freq/2), K_fourier)
+  
+  X_fourier = fourier(original_ts, K = K_fourier)
+  fourier_names = colnames(X_fourier)
+  fourier_names = str_replace(fourier_names, "-", "_") %>% str_to_lower()
+  colnames(X_fourier) = fourier_names
+  X_fourier_tibble = as_tibble(X_fourier)
+  
+  augmented = bind_cols(original, X_fourier_tibble)
+  return(augmented)
+}
+
+add_trend = function(original) {
+  nobs = nrow(original)
+  augmented = mutate(original, trend_lin = 1:nobs, trend_root = sqrt(1:nobs))
+  return(augmented)
+}
+
+
+
+# works only for one variable (without quotes)
+add_lags = function(original, variable, lags = c(1, 2)) {
+  variable = enquo(variable)
+  variable_name = quo_name(variable)
+  for (lag in lags) {
+    new_variable_name = paste0("lag", lag, "_", variable_name)
+    original = mutate(original, !!new_variable_name := lag(!!variable, lag))
+  }
+  return(original)
+}
+
+
+# works for many quoted variables
+add_lags2 = function(original, variable_names, lags = c(1, 2)) {
+  for (variable_name in variable_names) {
+    for (lag in lags) {
+      new_variable_name = paste0("lag", lag, "_", variable_name)
+      new_value = original %>% pull(variable_name) %>% lag(lag)
+      original = mutate(original, !!new_variable_name := new_value)
+    }
+  }
+  return(original)
+}
+
+
+
+get_last_date = function(original) {
+  date_variable = index(original)
+  date = original %>% pull(!!date_variable) 
+  # interval = pull_interval(date)
+  last_date = max(date)
+  return(last_date)
+}
+
+
+
+# forecast for h using lasso ----------------------------------------------------------
+
+
+augment_tsibble_4_regression = function(original, h = 1, frequency = 12) {
+  augmented = original %>% append_row(n = h) %>% 
+    add_trend() %>% add_fourier() %>% 
+    add_lags(value, lags = c(h, h + 1, frequency, frequency + 1))
+  regressor_names = setdiff(colnames(original), c("value", "date"))
+  augmented = augmented %>% add_lags2(regressor_names, lags = c(h, h + 1, frequency, frequency + 1))
+  augmented = augmented %>% select(-!!regressor_names)
+  return(augmented)
+}
+
+
+lasso_augmented_estimate = function(augmented) {
+  yX_tsibble = na.omit(augmented)
+  y = yX_tsibble %>% pull("value")
+  X = as_tibble(yX_tsibble) %>% select(-value, -date) %>% as.matrix()
+  
+  lasso_model = cv.glmnet(X, y)
+  return(lasso_model)
+}
+
+
+
+ranger_augmented_estimate = function(augmented, seed = 777) {
+  yX_tsibble = na.omit(augmented)
+  
+  set.seed(seed)
+  ranger_model = ranger(data = yX_tsibble, value ~ . - date)
+  return(ranger_model)  
+}
+
+
+
+lasso_fun = function(model_sample, h = 1) {
+  augmented_sample = augment_tsibble_4_regression(model_sample, h = h)
+  model = lasso_augmented_estimate(augmented_sample)
+
+  return(model)
+}
+
+ranger_fun = function(model_sample, h = 1) {
+  augmented_sample = augment_tsibble_4_regression(model_sample, h = h)
+  model = ranger_augmented_estimate(augmented_sample)
+  
+  return(model)
+}
+
+
+
+
+
+lasso_2_scalar_forecast = function(model, h = 1, model_sample, s = c("lambda.min", "lambda.1se")) {
+  s = match.arg(s)
+  
+  augmented_sample = augment_tsibble_4_regression(model_sample, h = h)
+  yX_future_tsibble = tail(augmented_sample, 1)
+  X_future = as_tibble(yX_future_tsibble) %>% select(-value, -date) %>% as.matrix()
+  
+  point_forecast = predict(model, X_future, s = s)
+  
+  return(point_forecast)
+}
+
+
+ranger_2_scalar_forecast = function(model, h = 1, model_sample, seed = 777) {
+
+  augmented_sample = augment_tsibble_4_regression(model_sample, h = h)
+  yX_future_tsibble = tail(augmented_sample, 1)
+
+  ranger_pred = predict(model, data = yX_future_tsibble)
+  point_forecast = ranger_pred$predictions
+  
+  return(point_forecast)
+}
+
+
+
+
+
+
 model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                          "ets_fun", TRUE, "uni_model_2_scalar_forecast",
+                          "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
                           "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
                           "arima_fun", TRUE, "uni_model_2_scalar_forecast",
-                          "arima11_fun", TRUE, "uni_model_2_scalar_forecast") #,
-#                          "lasso_fun", FALSE, "lasso_2_scalar_forecast",
-#                          "ranger_fun", FALSE, "ranger_2_scalar_forecast")
+                          "arima11_fun", TRUE, "uni_model_2_scalar_forecast",
+                          "lasso_fun", FALSE, "lasso_2_scalar_forecast",
+                          "ranger_fun", FALSE, "ranger_2_scalar_forecast")
                           
 
 
@@ -227,7 +374,7 @@ cv_results = crossing(date = dates_test, h = h_all, model_fun = model_fun_tibble
 cv_results
 
 
-cv_results = left_join(cv_results, select(rus_m_full, value), by = "date")
+cv_results = left_join(cv_results, select(rus_m_full_stable, value), by = "date")
 
 
 
@@ -240,7 +387,7 @@ window_min_length = round(interval(full_sample_start_date, test_sample_start_dat
 
 
 if (window_type == "stretching") {
-  cv_results = mutate(cv_results, train_start_date = min(pull(rus_m_full, date)))
+  cv_results = mutate(cv_results, train_start_date = min(pull(rus_m_full_stable, date)))
 } else {
   # sliding window case
   cv_results = mutate(cv_results, train_start_date = train_end_date - months(window_min_length - 1))
@@ -287,15 +434,62 @@ cv_results_new = bind_rows(cv_res_models, cv_duplicate_models)
 
 # add forecasts... --------------------------------------------------------
 
-cv_results_new = mutate(cv_results_new, regressors_forecast = NA) 
 cv_results_new = mutate(cv_results_new, 
-     point_forecast = pmap_dbl(list(fitted_model, h, regressors_forecast, forecast_extractor), 
-                        ~ do.call(..4, list(model = ..1, h = ..2, regressors_forecast = ..3))
+     point_forecast = pmap_dbl(list(fitted_model, h, train_sample, forecast_extractor), 
+                        ~ do.call(..4, list(model = ..1, h = ..2, model_sample = ..3))
                         ))
 mae_table = cv_results_new %>% select(h, model_fun, value, point_forecast) %>%
   mutate(abs_diff = abs(value - point_forecast))  %>%
   group_by(h, model_fun) %>% summarise(mae = mean(abs_diff))
+
+# sort by mae for each h:
+mae_table = mae_table %>% arrange(h, mae) 
 mae_table
+
+write_csv(mae_table, path = "cpi_mae_table.csv")
+
+
+
+# real forecasting....
+
+full_sample_start_date = min(rus_m_full_stable$date)
+full_sample_last_date = max(rus_m_full_stable$date)
+
+
+
+the_forecasts = crossing(h = h_all, model_fun = model_fun_tibble$model_fun)
+the_forecasts = mutate(the_forecasts, date = as.Date(full_sample_last_date) + months(h))
+the_forecasts = mutate(the_forecasts, train_end_date = as.Date(full_sample_last_date))
+the_forecasts = mutate(the_forecasts, train_start_date = as.Date(full_sample_start_date))
+
+
+the_forecasts = mutate(the_forecasts, 
+                    train_sample = pmap(list(x = train_start_date, y = train_end_date), 
+                                        ~ filter(rus_m_full_stable, date >= .x, date <= .y)))
+
+
+# we estimate some models only with maximal h -----------------------------------
+
+the_forecasts = left_join(the_forecasts,  model_fun_tibble, by = "model_fun")
+
+the_forecasts = the_forecasts %>% group_by(train_end_date, train_start_date, model_fun) %>%
+  mutate(duplicate_model = h_agnostic & (h < max(h))) %>% ungroup()
+
+
+# models in tibble version ------------------------------------------------
+
+
+the_forecasts = the_forecasts %>% filter(!duplicate_model) %>%
+  mutate(
+    fitted_model = pmap(list(train_sample, h, model_fun), 
+                        ~ do.call(..3, list(h = ..2, model_sample = ..1))
+    ))
+
+
+
+
+
+
 
 # gdp univariate models -------------------------------------------------------
 
@@ -330,122 +524,7 @@ gdp_tbats_forecast
 autoplot(gdp_tbats_forecast)
 
 
-# make augmented tsibble ------------------------------------------------------------
-
-# input: tsibble
-# output: tsibble
-
-
-add_fourier = function(original, K_fourier = Inf) {
-  original_ts = as.ts(original)
-  freq = frequency(original)
-  K_fourier = min(floor(freq/2), K_fourier)
-  
-  X_fourier = fourier(original_ts, K = K_fourier)
-  fourier_names = colnames(X_fourier)
-  fourier_names = str_replace(fourier_names, "-", "_") %>% str_to_lower()
-  colnames(X_fourier) = fourier_names
-  X_fourier_tibble = as_tibble(X_fourier)
-  
-  augmented = bind_cols(original, X_fourier_tibble)
-  return(augmented)
-}
-
-add_trend = function(original) {
-  nobs = nrow(original)
-  augmented = mutate(original, trend_lin = 1:nobs, trend_root = sqrt(1:nobs))
-  return(augmented)
-}
-
-
-
-# works only for one variable (without quotes)
-add_lags = function(original, variable, lags = c(1, 2)) {
-  variable = enquo(variable)
-  variable_name = quo_name(variable)
-  for (lag in lags) {
-      new_variable_name = paste0("lag", lag, "_", variable_name)
-      original = mutate(original, !!new_variable_name := lag(!!variable, lag))
-  }
-  return(original)
-}
-
-
-# works for many quoted variables
-add_lags2 = function(original, variable_names, lags = c(1, 2)) {
-  for (variable_name in variable_names) {
-    for (lag in lags) {
-      new_variable_name = paste0("lag", lag, "_", variable_name)
-      new_value = original %>% pull(variable_name) %>% lag(lag)
-      original = mutate(original, !!new_variable_name := new_value)
-    }
-  }
-  return(original)
-}
-
-
-
-get_last_date = function(original) {
-  date_variable = index(original)
-  date = rus_m_full %>% pull(!!date_variable) 
-  interval = pull_interval(date)
-  last_date = max(date)
-  return(last_date)
-}
-
-
-
-# forecast for h using lasso ----------------------------------------------------------
-
-
-augment_tsibble_4_regression = function(original, h = 1, frequency = 12) {
-  augmented = original %>% append_row(n = h) %>% 
-    add_trend() %>% add_fourier() %>% 
-    add_lags(value, lags = c(h, h + 1, frequency, frequency + 1))
-  regressor_names = setdiff(colnames(original), c("value", "date"))
-  augmented = augmented %>% add_lags2(regressor_names, lags = c(h, h + 1, frequency, frequency + 1))
-  augmented = augmented %>% select(-!!regressor_names)
-  return(augmented)
-}
-
-lasso_forecast = function(augmented, s = c("lambda.min", "lambda.1se")) {
-  s = match.arg(s)
-  
-  yX_future_tsibble = tail(augmented, 1)
-  X_future = as_tibble(yX_future_tsibble) %>% select(-value, -date) %>% as.matrix()
-
-  yX_tsibble = na.omit(augmented)
-  y = yX_tsibble %>% pull("value")
-  X = as_tibble(yX_tsibble) %>% select(-value, -date) %>% as.matrix()
-
-  lasso_model = cv.glmnet(X, y)
-  point_forecast = predict(lasso_model, X_future, s = s)
-  return(point_forecast)
-}
-
-
-
-
-
-ranger_forecast = function(augmented, seed = 777) {
-  yX_future_tsibble = tail(augmented, 1)
-
-  yX_tsibble = na.omit(augmented)
-
-  set.seed(seed)
-  ranger_model = ranger(data = yX_tsibble, value ~ . - date)
-  ranger_pred = predict(ranger_model, data = yX_future_tsibble)
-  point_forecast = ranger_pred$predictions
-  
-  return(point_forecast)
-}
-
-rus_augmented = augment_tsibble_4_regression(rus_m_full, h = 1)
-
-
-lasso_forecast(rus_augmented)
-ranger_forecast(rus_augmented)
-
+# ---
 
 
 
