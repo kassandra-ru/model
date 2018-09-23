@@ -452,10 +452,6 @@ write_csv(mae_table, path = "cpi_mae_table.csv")
 
 # real forecasting....
 
-full_sample_start_date = min(rus_m_full_stable$date)
-full_sample_last_date = max(rus_m_full_stable$date)
-
-
 
 the_forecasts = crossing(h = h_all, model_fun = model_fun_tibble$model_fun)
 the_forecasts = mutate(the_forecasts, date = as.Date(full_sample_last_date) + months(h))
@@ -479,15 +475,33 @@ the_forecasts = the_forecasts %>% group_by(train_end_date, train_start_date, mod
 # models in tibble version ------------------------------------------------
 
 
-the_forecasts = the_forecasts %>% filter(!duplicate_model) %>%
+the_forecasts_fitted = the_forecasts %>% filter(!duplicate_model) %>%
   mutate(
     fitted_model = pmap(list(train_sample, h, model_fun), 
                         ~ do.call(..3, list(h = ..2, model_sample = ..1))
     ))
 
 
+right_tibble = the_forecasts_fitted %>% filter(h_agnostic) %>%
+  select(model_fun, train_start_date, train_end_date, fitted_model) 
+
+the_forecasts_duplicate_models_wo_fitted = the_forecasts %>% filter(duplicate_model)
+
+the_forecasts_duplicate_models = left_join(the_forecasts_duplicate_models_wo_fitted, right_tibble, 
+                                by = c("model_fun", "train_start_date", "train_end_date"))
+
+the_forecasts_new = bind_rows(the_forecasts_fitted, the_forecasts_duplicate_models)
 
 
+# add forecasts... --------------------------------------------------------
+
+the_forecasts_new = mutate(the_forecasts_new, 
+                        point_forecast = pmap_dbl(list(fitted_model, h, train_sample, forecast_extractor), 
+                                                  ~ do.call(..4, list(model = ..1, h = ..2, model_sample = ..3))
+                        ))
+
+
+write_csv(the_forecasts_new %>% select(date, h, model_fun, point_forecast), path = "forecasts.csv")
 
 
 
