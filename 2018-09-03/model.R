@@ -77,6 +77,7 @@ colnames(rus_m) = c("date", "empl_manuf", "ind_prod", "cpi_index", "ib_rate", "l
 
 cpi = mutate(cpi, date = ymd(date))
 gdp = mutate(gdp, date = ymd(date))
+gdp_deflator = mutate(gdp_deflator, date = ymd(date))
 
 rus_m = mutate(rus_m, date = as_date(yearmonth(date))) 
 rus_q = mutate(rus_q, date = yq(date)) 
@@ -87,6 +88,9 @@ glimpse(rus_m)
 
 rus_m = left_join(cpi, rus_m, by = "date")
 rus_q = left_join(gdp, rus_q, by = "date")
+
+gdp_deflator = rename(gdp_deflator, gdp_deflator = value)
+rus_q = left_join(rus_q, gdp_deflator, by = "date")
 
 rus_m = mutate(rus_m, date = yearmonth(date))
 rus_q = mutate(rus_q, date = yearquarter(date))
@@ -107,10 +111,15 @@ ggseasonplot(cpi_m_ts)
 vis_miss(rus_m)
 vis_miss(rus_q)
 
+
+# select full variables ---------------------------------------------------
+
+
+
 rus_m_full = select(rus_m, real_income, unempl, constr_nat, real_wage, rts_index, agric_index, retail_index, value)
 vis_miss(rus_m_full)
 
-rus_q_full = select(rus_q, value, access_date, ir, reserves, real_wage, population)
+rus_q_full = select(rus_q, value, access_date, ir, reserves, real_wage, population, gdp_deflator)
 vis_miss(rus_q_full)
 
 # cpi univariate models -------------------------------------------------------
@@ -120,7 +129,6 @@ start_date = ymd("2011-10-01")
 rus_m_full_stable = filter(rus_m_full, date >= start_date)
 
 
-the_frequency = as.ts(rus_m_full_stable) %>% frequency()
 
 
 # cpi quality evaluation --------------------------------------------------
@@ -274,11 +282,12 @@ augment_tsibble_4_regression = function(original, h = 1) {
 }
 
 
-lasso_augmented_estimate = function(augmented) {
+lasso_augmented_estimate = function(augmented, seed = 777) {
   yX_tsibble = na.omit(augmented)
   y = yX_tsibble %>% pull("value")
   X = as_tibble(yX_tsibble) %>% select(-value, -date) %>% as.matrix()
   
+  set.seed(seed)
   lasso_model = cv.glmnet(X, y)
   return(lasso_model)
 }
@@ -398,7 +407,7 @@ cv_res_models = cv_results %>% filter(!duplicate_model) %>%
                       ~ do.call(..3, list(h = ..2, model_sample = ..1))
                                ))
 
-write_rds(cv_results, "cv_res_models.Rds")
+write_rds(cv_results, "cv_res_models_b.Rds")
 
 
 
@@ -429,7 +438,7 @@ mae_table = cv_results_new %>% select(h, model_fun, value, point_forecast) %>%
 mae_table = mae_table %>% arrange(h, mae) 
 mae_table
 
-write_csv(mae_table, path = "cpi_mae_table.csv")
+write_csv(mae_table, path = "cpi_mae_table_b.csv")
 
 
 
@@ -484,47 +493,36 @@ the_forecasts_new = mutate(the_forecasts_new,
                         ))
 
 
-write_csv(the_forecasts_new %>% select(date, h, model_fun, point_forecast), path = "forecasts.csv")
+write_csv(the_forecasts_new %>% select(date, h, model_fun, point_forecast), path = "forecasts_b.csv")
 
 
 
 # gdp univariate models -------------------------------------------------------
 
-rus_q = filter(rus_q_full, date >= ymd("2000-01-01"))
+start_date = ymd("2011-10-01")
 
-fable_gdp1_arima = rus_q %>% ARIMA(value) %>% forecast(h = 3)
-fable_gdp1_ets = rus_q %>% ETS(value) %>% forecast(h = 3)
-
-fable_gdp1_arima %>% autoplot
-fable_gdp1_ets %>% autoplot
-
-
-fable_gdp1_arima$forecast[[1]] %>% .$mean
-fable_gdp1_ets$forecast[[1]] %>% .$mean
-
-
-rus_q2 = filter(rus_q_full, date >= ymd("2011-10-01"))
-
-fable_gdp2_arima = rus_q2 %>% ARIMA(value) %>% forecast(h = 3)
-fable_gdp2_ets = rus_q2 %>% ETS(value) %>% forecast(h = 3)
-
-fable_gdp2_arima %>% autoplot()
-fable_gdp2_ets %>% autoplot()
-
-fable_gdp2_arima$forecast[[1]] %>% .$mean
-fable_gdp2_ets$forecast[[1]] %>% .$mean
-
-gdp2_value = ts(rus_q2$value, freq = 4, start = c(2011, 4))
-gdp_tbats = gdp2_value %>% tbats() 
-gdp_tbats_forecast = gdp_tbats %>% forecast(h = 3)
-gdp_tbats_forecast
-autoplot(gdp_tbats_forecast)
-
-
-# ---
+rus_q_full_stable = filter(rus_q_full, date >= start_date)
 
 
 
+
+# gdp quality evaluation --------------------------------------------------
+
+# TODO: rename test to eval
+
+proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
+
+nobs_full = nrow(rus_q_full_stable)
+nobs_test = round(proportion_test * nobs_full)
+
+window_type = "sliding" # "sliding" or "stretching" as in tsibble
+
+
+dates_test = tail(rus_q_full_stable$date, nobs_test)
+
+
+
+h_all = 1:3
 
 
 
