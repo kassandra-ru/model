@@ -24,6 +24,7 @@ Sys.setlocale("LC_TIME", "C")
 cpi = import("../2018-08-31/data_snapshot/cpi_inflation.csv")
 gdp = import("../2018-08-31/data_snapshot/gdp.csv")
 gdp_deflator = import("../2018-09-27/data_snapshot/gdp_deflator.csv")
+gdp_real_2016_price = import("../2018-09-27/data_snapshot/gdp_real_2016_price.csv")
 
 rus_m = import("../2018-08-31/data_snapshot/russia_monthly.csv")
 rus_m_info = import("../2018-08-31/data_snapshot/russia_monthly_info.csv")
@@ -78,6 +79,7 @@ colnames(rus_m) = c("date", "empl_manuf", "ind_prod", "cpi_index", "ib_rate", "l
 cpi = mutate(cpi, date = ymd(date))
 gdp = mutate(gdp, date = ymd(date))
 gdp_deflator = mutate(gdp_deflator, date = ymd(date))
+gdp_real_2016_price = mutate(gdp_real_2016_price, date = ymd(date))
 
 rus_m = mutate(rus_m, date = as_date(yearmonth(date))) 
 rus_q = mutate(rus_q, date = yq(date)) 
@@ -90,7 +92,10 @@ rus_m = left_join(cpi, rus_m, by = "date")
 rus_q = left_join(gdp, rus_q, by = "date")
 
 gdp_deflator = rename(gdp_deflator, gdp_deflator = value)
-rus_q = left_join(rus_q, gdp_deflator, by = "date")
+gdp_real_2016_price = rename(gdp_real_2016_price, gdp_real_2016_price = value)
+rus_q = full_join(rus_q, gdp_deflator, by = "date")
+rus_q = full_join(rus_q, gdp_real_2016_price, by = "date")
+
 
 rus_m = mutate(rus_m, date = yearmonth(date))
 rus_q = mutate(rus_q, date = yearquarter(date))
@@ -407,7 +412,7 @@ cv_res_models = cv_results %>% filter(!duplicate_model) %>%
                       ~ do.call(..3, list(h = ..2, model_sample = ..1))
                                ))
 
-write_rds(cv_results, "cv_res_models_b.Rds")
+write_rds(cv_results, "cv_res_models.Rds")
 
 
 
@@ -438,7 +443,7 @@ mae_table = cv_results_new %>% select(h, model_fun, value, point_forecast) %>%
 mae_table = mae_table %>% arrange(h, mae) 
 mae_table
 
-write_csv(mae_table, path = "cpi_mae_table_b.csv")
+write_csv(mae_table, path = "cpi_mae_table.csv")
 
 
 
@@ -493,7 +498,7 @@ the_forecasts_new = mutate(the_forecasts_new,
                         ))
 
 
-write_csv(the_forecasts_new %>% select(date, h, model_fun, point_forecast), path = "forecasts_b.csv")
+write_csv(the_forecasts_new %>% select(date, h, model_fun, point_forecast), path = "forecasts.csv")
 
 
 
