@@ -23,6 +23,7 @@ Sys.setlocale("LC_TIME", "C")
 
 cpi = import("../2018-08-31/data_snapshot/cpi_inflation.csv")
 gdp = import("../2018-08-31/data_snapshot/gdp.csv")
+gdp_deflator = import("../2018-09-27/data_snapshot/gdp_deflator.csv")
 
 rus_m = import("../2018-08-31/data_snapshot/russia_monthly.csv")
 rus_m_info = import("../2018-08-31/data_snapshot/russia_monthly_info.csv")
@@ -119,27 +120,7 @@ start_date = ymd("2011-10-01")
 rus_m_full_stable = filter(rus_m_full, date >= start_date)
 
 
-cpi_value = ts(rus_m_full_stable$value, freq = 12, start = c(year(start_date), month(start_date)))
-
-tbats_model = cpi_value %>% tbats() 
-ets_model = cpi_value %>% ets()
-arima_model = Arima(cpi_value)
-arima_11_11_model = Arima(cpi_value, order = c(1, 0, 1), seasonal = c(1, 0, 1))
-
-
-
-cpi_tbats_forecast = tbats_model %>% forecast(h = 6)
-cpi_arima_forecast = arima_model %>% forecast(h = 6)
-cpi_arima_11_11_forecast = arima_11_11_model %>% forecast(h = 6)
-cpi_ets_forecast = ets_model %>% forecast(h = 6)
-
-
-cpi_ets_forecast
-cpi_arima_forecast
-cpi_arima_11_11_forecast
-cpi_tbats_forecast
-
-
+the_frequency = as.ts(rus_m_full_stable) %>% frequency()
 
 
 # cpi quality evaluation --------------------------------------------------
@@ -164,6 +145,7 @@ h_all = 1:6
 # model should take: h, model_sample (multivariate tsibble)
 # produce some model :)
 # may ignore h
+
 
 extract_value = function(model_sample) {
   y = model_sample %>% select(value) %>% as.ts()
@@ -280,7 +262,8 @@ get_last_date = function(original) {
 # forecast for h using lasso ----------------------------------------------------------
 
 
-augment_tsibble_4_regression = function(original, h = 1, frequency = 12) {
+augment_tsibble_4_regression = function(original, h = 1) {
+  frequency = frequency(original)
   augmented = original %>% append_row(n = h) %>% 
     add_trend() %>% add_fourier() %>% 
     add_lags(value, lags = c(h, h + 1, frequency, frequency + 1))
@@ -378,19 +361,19 @@ cv_results = left_join(cv_results, select(rus_m_full_stable, value), by = "date"
 
 
 
-cv_results = mutate(cv_results, train_end_date = date - months(h))
+cv_results = mutate(cv_results, train_end_date = date - months(h * 12 / frequency(rus_m_full_stable)))
 
 full_sample_start_date = min(rus_m_full_stable$date)
 full_sample_last_date = max(rus_m_full_stable$date)
 test_sample_start_date = min(cv_results$date)
-window_min_length = round(interval(full_sample_start_date, test_sample_start_date) /  months(1)) - max(h_all) + 1
+window_min_length = round(interval(full_sample_start_date, test_sample_start_date) /  months(12 / frequency(rus_m_full_stable))) - max(h_all) + 1
 
 
 if (window_type == "stretching") {
   cv_results = mutate(cv_results, train_start_date = min(pull(rus_m_full_stable, date)))
 } else {
   # sliding window case
-  cv_results = mutate(cv_results, train_start_date = train_end_date - months(window_min_length - 1))
+  cv_results = mutate(cv_results, train_start_date = train_end_date - months((window_min_length - 1) * 12 / frequency(rus_m_full_stable) ))
 }
 
 cv_results = mutate(cv_results, 
@@ -454,7 +437,7 @@ write_csv(mae_table, path = "cpi_mae_table.csv")
 
 
 the_forecasts = crossing(h = h_all, model_fun = model_fun_tibble$model_fun)
-the_forecasts = mutate(the_forecasts, date = as.Date(full_sample_last_date) + months(h))
+the_forecasts = mutate(the_forecasts, date = as.Date(full_sample_last_date) + months(h * 12 / frequency(rus_m_full_stable)))
 the_forecasts = mutate(the_forecasts, train_end_date = as.Date(full_sample_last_date))
 the_forecasts = mutate(the_forecasts, train_start_date = as.Date(full_sample_start_date))
 
