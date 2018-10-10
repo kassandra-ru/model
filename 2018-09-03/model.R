@@ -124,7 +124,7 @@ vis_miss(rus_q)
 rus_m_full = select(rus_m, real_income, unempl, constr_nat, real_wage, rts_index, agric_index, retail_index, value)
 vis_miss(rus_m_full)
 
-rus_q_full = select(rus_q, value, access_date, ir, reserves, real_wage, population, gdp_deflator)
+rus_q_full = select(rus_q, value, access_date, ir, reserves, real_wage, population, gdp_deflator, gdp_real_2016_price)
 vis_miss(rus_q_full)
 
 # cpi univariate models -------------------------------------------------------
@@ -365,140 +365,153 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
                           "ranger_fun", FALSE, "ranger_2_scalar_forecast")
                           
 
+# for quality evaluation
+prepare_model_list = function(h_all = 1, model_fun_tibble, series_data, dates_test, window_type = "sliding") {
+  model_list = crossing(date = dates_test, h = h_all, model_fun = model_fun_tibble$model_fun)
+  model_list = left_join(model_list, select(series_data, value), by = "date")
 
-
-cv_results = crossing(date = dates_test, h = h_all, model_fun = model_fun_tibble$model_fun)
-cv_results
-
-
-cv_results = left_join(cv_results, select(rus_m_full_stable, value), by = "date")
-
-
-
-cv_results = mutate(cv_results, train_end_date = date - months(h * 12 / frequency(rus_m_full_stable)))
-
-full_sample_start_date = min(rus_m_full_stable$date)
-full_sample_last_date = max(rus_m_full_stable$date)
-test_sample_start_date = min(cv_results$date)
-window_min_length = round(interval(full_sample_start_date, test_sample_start_date) /  months(12 / frequency(rus_m_full_stable))) - max(h_all) + 1
-
-
-if (window_type == "stretching") {
-  cv_results = mutate(cv_results, train_start_date = min(pull(rus_m_full_stable, date)))
-} else {
-  # sliding window case
-  cv_results = mutate(cv_results, train_start_date = train_end_date - months((window_min_length - 1) * 12 / frequency(rus_m_full_stable) ))
+  model_list = mutate(model_list, train_end_date = date - months(h * 12 / frequency(series_data)))
+  
+  full_sample_start_date = min(series_data$date)
+  full_sample_last_date = max(series_data$date)
+  test_sample_start_date = min(model_list$date)
+  window_min_length = round(interval(full_sample_start_date, test_sample_start_date) /  months(12 / frequency(series_data))) - max(h_all) + 1
+  
+  
+  if (window_type == "stretching") {
+    model_list = mutate(model_list, train_start_date = min(pull(series_data, date)))
+  } else {
+    # sliding window case
+    model_list = mutate(model_list, train_start_date = train_end_date - months((window_min_length - 1) * 12 / frequency(series_data) ))
+  }
+  
+  model_list = mutate(model_list, 
+                      train_sample = pmap(list(x = train_start_date, y = train_end_date), 
+                                          ~ filter(series_data, date >= .x, date <= .y)))
+  
+  
+  # we estimate some models only with maximal h -----------------------------------
+  
+  model_list = left_join(model_list,  model_fun_tibble, by = "model_fun")
+  
+  model_list = model_list %>% group_by(train_end_date, train_start_date, model_fun) %>%
+    mutate(duplicate_model = h_agnostic & (h < max(h))) %>% ungroup()
+  
+  return(model_list)
 }
 
-cv_results = mutate(cv_results, 
-      train_sample = pmap(list(x = train_start_date, y = train_end_date), 
-            ~ filter(rus_m_full_stable, date >= .x, date <= .y)))
 
 
-# we estimate some models only with maximal h -----------------------------------
 
-cv_results = left_join(cv_results,  model_fun_tibble, by = "model_fun")
-                       
-cv_results = cv_results %>% group_by(train_end_date, train_start_date, model_fun) %>%
-  mutate(duplicate_model = h_agnostic & (h < max(h))) %>% ungroup()
+# for forecasts
+prepare_model_list2 = function(h_all = 1, model_fun_tibble, series_data) {
+  
+  full_sample_last_date = as.Date(max(series_data$date))
+  full_sample_start_date = as.Date(min(series_data$date))
+    
+  model_list = crossing(h = h_all, model_fun = model_fun_tibble$model_fun)
+  model_list = mutate(model_list, date = full_sample_last_date + months(h * 12 / frequency(series_data)))
+  model_list = mutate(model_list, train_end_date = full_sample_last_date)
+  model_list = mutate(model_list, train_start_date = full_sample_start_date)
+  
+  
+  model_list = mutate(model_list, 
+                         train_sample = pmap(list(x = train_start_date, y = train_end_date), 
+                                             ~ filter(series_data, date >= .x, date <= .y)))
+  
+  
+  # we estimate some models only with maximal h -----------------------------------
+  
+  model_list = left_join(model_list,  model_fun_tibble, by = "model_fun")
+  
+  model_list = model_list %>% group_by(train_end_date, train_start_date, model_fun) %>%
+    mutate(duplicate_model = h_agnostic & (h < max(h))) %>% ungroup()
+  return(model_list)
+}
+
+
+# TODO: reconsider two prepare_model functions
+
 
 
 # models in tibble version ------------------------------------------------
 
 
-cv_res_models = cv_results %>% filter(!duplicate_model) %>%
-  mutate(
-  fitted_model = pmap(list(train_sample, h, model_fun), 
-                      ~ do.call(..3, list(h = ..2, model_sample = ..1))
-                               ))
-
-write_rds(cv_results, "cv_res_models.Rds")
-
+estimate_nonduplicate_models = function(model_list, store_models = c("tibble", "file")) {
+  store_models = match.arg(store_models)
+  
+  if (store_models == "file") {
+    stop("File storage of models not implemented yet")
+  }
+  
+  model_list_half_fitted = filter(model_list, !duplicate_model)
+  model_list_half_fitted = model_list_half_fitted %>% mutate(
+      fitted_model = pmap(list(train_sample, h, model_fun), ~ do.call(..3, list(h = ..2, model_sample = ..1)))
+    )
+  return(model_list_half_fitted)
+}
 
 
 # fill duplicate models ---------------------------------------------------
 
-right_tibble = cv_res_models %>% filter(h_agnostic) %>%
-  select(model_fun, train_start_date, train_end_date, fitted_model) 
+fill_duplicate_models = function(model_list_half_fitted, full_model_list) {
+  right_tibble = model_list_half_fitted %>% filter(h_agnostic) %>%
+    select(model_fun, train_start_date, train_end_date, fitted_model) 
+  
+  duplicate_models = full_model_list %>% filter(duplicate_model)
+  
+  duplicate_models_fitted = left_join(duplicate_models, right_tibble, 
+                                  by = c("model_fun", "train_start_date", "train_end_date"))
+  
+  model_list_fitted = bind_rows(model_list_half_fitted, duplicate_models_fitted)
+  return(model_list_fitted)
+}
 
-cv_duplicate_models_wo_fitted = cv_results %>% filter(duplicate_model)
+add_point_forecasts = function(model_list_fitted) {
+  model_list_fitted = mutate(model_list_fitted, 
+                          point_forecast = pmap_dbl(list(fitted_model, h, train_sample, forecast_extractor), 
+                                                    ~ do.call(..4, list(model = ..1, h = ..2, model_sample = ..3))
+                          ))
+  return(model_list_fitted)
+}
 
-cv_duplicate_models = left_join(cv_duplicate_models_wo_fitted, right_tibble, 
-        by = c("model_fun", "train_start_date", "train_end_date"))
+calculate_mae_table = function(model_list_fitted) {
+  mae_table = model_list_fitted %>% select(h, model_fun, value, point_forecast) %>%
+    mutate(abs_diff = abs(value - point_forecast))  %>%
+    group_by(h, model_fun) %>% summarise(mae = mean(abs_diff))
+  
+  # sort by mae for each h:
+  mae_table = mae_table %>% arrange(h, mae) 
+  
+  return(mae_table)
+}
 
-cv_results_new = bind_rows(cv_res_models, cv_duplicate_models)
 
+# all the code is here!
 
-# add forecasts... --------------------------------------------------------
+cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
+                                window_type = window_type, series_data = rus_m_full_stable)
+cv_res_models = estimate_nonduplicate_models(cv_results)
+cv_results_new = fill_duplicate_models(cv_res_models, cv_results)
+cv_results_new = add_point_forecasts(cv_results_new)
+mae_table = calculate_mae_table(cv_results_new)
 
-cv_results_new = mutate(cv_results_new, 
-     point_forecast = pmap_dbl(list(fitted_model, h, train_sample, forecast_extractor), 
-                        ~ do.call(..4, list(model = ..1, h = ..2, model_sample = ..3))
-                        ))
-mae_table = cv_results_new %>% select(h, model_fun, value, point_forecast) %>%
-  mutate(abs_diff = abs(value - point_forecast))  %>%
-  group_by(h, model_fun) %>% summarise(mae = mean(abs_diff))
-
-# sort by mae for each h:
-mae_table = mae_table %>% arrange(h, mae) 
-mae_table
-
-write_csv(mae_table, path = "cpi_mae_table.csv")
 
 
 
 # real forecasting....
 
 
-the_forecasts = crossing(h = h_all, model_fun = model_fun_tibble$model_fun)
-the_forecasts = mutate(the_forecasts, date = as.Date(full_sample_last_date) + months(h * 12 / frequency(rus_m_full_stable)))
-the_forecasts = mutate(the_forecasts, train_end_date = as.Date(full_sample_last_date))
-the_forecasts = mutate(the_forecasts, train_start_date = as.Date(full_sample_start_date))
-
-
-the_forecasts = mutate(the_forecasts, 
-                    train_sample = pmap(list(x = train_start_date, y = train_end_date), 
-                                        ~ filter(rus_m_full_stable, date >= .x, date <= .y)))
-
-
-# we estimate some models only with maximal h -----------------------------------
-
-the_forecasts = left_join(the_forecasts,  model_fun_tibble, by = "model_fun")
-
-the_forecasts = the_forecasts %>% group_by(train_end_date, train_start_date, model_fun) %>%
-  mutate(duplicate_model = h_agnostic & (h < max(h))) %>% ungroup()
-
 
 # models in tibble version ------------------------------------------------
 
+the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable)
+the_forecasts_fitted = estimate_nonduplicate_models(the_forecasts)
+the_forecasts_new = fill_duplicate_models(the_forecasts_fitted, the_forecasts)
+the_forecasts_new = add_point_forecasts(the_forecasts_new)
 
-the_forecasts_fitted = the_forecasts %>% filter(!duplicate_model) %>%
-  mutate(
-    fitted_model = pmap(list(train_sample, h, model_fun), 
-                        ~ do.call(..3, list(h = ..2, model_sample = ..1))
-    ))
-
-
-right_tibble = the_forecasts_fitted %>% filter(h_agnostic) %>%
-  select(model_fun, train_start_date, train_end_date, fitted_model) 
-
-the_forecasts_duplicate_models_wo_fitted = the_forecasts %>% filter(duplicate_model)
-
-the_forecasts_duplicate_models = left_join(the_forecasts_duplicate_models_wo_fitted, right_tibble, 
-                                by = c("model_fun", "train_start_date", "train_end_date"))
-
-the_forecasts_new = bind_rows(the_forecasts_fitted, the_forecasts_duplicate_models)
-
-
-# add forecasts... --------------------------------------------------------
-
-the_forecasts_new = mutate(the_forecasts_new, 
-                        point_forecast = pmap_dbl(list(fitted_model, h, train_sample, forecast_extractor), 
-                                                  ~ do.call(..4, list(model = ..1, h = ..2, model_sample = ..3))
-                        ))
-
-
-write_csv(the_forecasts_new %>% select(date, h, model_fun, point_forecast), path = "forecasts.csv")
+only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
+# write_csv(only_numbers, path = "forecasts.csv")
 
 
 
@@ -507,7 +520,7 @@ write_csv(the_forecasts_new %>% select(date, h, model_fun, point_forecast), path
 start_date = ymd("2011-10-01")
 
 rus_q_full_stable = filter(rus_q_full, date >= start_date)
-
+rus_q_full_stable = rename(rus_q_full_stable, gdp_nominal = value, value = gdp_real_2016_price)
 
 
 
@@ -522,14 +535,42 @@ nobs_test = round(proportion_test * nobs_full)
 
 window_type = "sliding" # "sliding" or "stretching" as in tsibble
 
-
 dates_test = tail(rus_q_full_stable$date, nobs_test)
-
-
 
 h_all = 1:3
 
 
+model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
+                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
+                           "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
+                           "arima_fun", TRUE, "uni_model_2_scalar_forecast")
+#                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
 
 
+
+# TODO: exact ML in case where ARMA(1,1)-SARMA(1,1) fails
+
+cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
+                                window_type = window_type, series_data = rus_q_full_stable)
+cv_res_models = estimate_nonduplicate_models(cv_results)
+cv_results_new = fill_duplicate_models(cv_res_models, cv_results)
+cv_results_new = add_point_forecasts(cv_results_new)
+mae_table = calculate_mae_table(cv_results_new)
+
+mae_table
+write_csv(mae_table, "mae_table_gdp_real.csv")
+
+# real forecasting....
+
+
+# models in tibble version ------------------------------------------------
+
+the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_q_full_stable)
+the_forecasts_fitted = estimate_nonduplicate_models(the_forecasts)
+the_forecasts_new = fill_duplicate_models(the_forecasts_fitted, the_forecasts)
+the_forecasts_new = add_point_forecasts(the_forecasts_new)
+
+only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
+only_numbers
+write_csv(only_numbers, path = "forecasts_gdp_real.csv")
 
