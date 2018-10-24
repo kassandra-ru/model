@@ -519,8 +519,10 @@ only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 
 start_date = ymd("2011-10-01")
 
+rus_q_full = mutate(rus_q_full, gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
+
 rus_q_full_stable = filter(rus_q_full, date >= start_date)
-rus_q_full_stable = rename(rus_q_full_stable, gdp_nominal = value, value = gdp_real_2016_price)
+rus_q_full_stable = rename(rus_q_full_stable, gdp_nominal = value, value = gdp_rate)
 
 
 
@@ -543,8 +545,8 @@ h_all = 1:3
 model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
                            "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
                            "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima_fun", TRUE, "uni_model_2_scalar_forecast")
-#                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
+                           "arima_fun", TRUE, "uni_model_2_scalar_forecast",
+                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
 
 
 
@@ -558,7 +560,7 @@ cv_results_new = add_point_forecasts(cv_results_new)
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table
-write_csv(mae_table, "mae_table_gdp_real.csv")
+write_csv(mae_table, "mae_table_gdp_rate_real.csv")
 
 # real forecasting....
 
@@ -572,5 +574,5 @@ the_forecasts_new = add_point_forecasts(the_forecasts_new)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 only_numbers
-write_csv(only_numbers, path = "forecasts_gdp_real.csv")
+write_csv(only_numbers, path = "forecasts_gdp_rate_real.csv")
 
