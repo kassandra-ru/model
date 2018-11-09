@@ -329,13 +329,10 @@ calculate_mae_table = function(model_list_fitted) {
 
 
 
-get_last_n_obs = function(hf_data, hf_variable, lf_date, n_lags = 1, one_row = TRUE) {
+get_last_n_obs = function(hf_data, lf_date, n_lags = 1, one_row = TRUE) {
   
-  ts_subset = select(hf_data, date, !!hf_variable) %>% 
-    filter(date <= lf_date) %>% 
-    na.omit() %>% tail(n_lags)
-  # ts_vector = pull(ts_subset, !!hf_variable)
-  
+  ts_subset = filter(hf_data, date <= lf_date) %>% tail(n_lags)
+
   n_actual = nrow(ts_subset)
   if (n_actual < n_lags) {
     # create empty data frame
@@ -344,8 +341,7 @@ get_last_n_obs = function(hf_data, hf_variable, lf_date, n_lags = 1, one_row = T
     # append it before
     ts_subset = bind_rows(empty_df, ts_subset)
   } 
-  
-  
+
   if (one_row) {
     ts_subset = mutate(ts_subset, lag_no = n_lags:1)
     ts_long = ts_subset %>% as_tibble() %>% select(-date) %>% gather(key = "variable", value = "value", -lag_no) %>%
@@ -359,19 +355,36 @@ get_last_n_obs = function(hf_data, hf_variable, lf_date, n_lags = 1, one_row = T
   }
 }
 
+ts_2_tibble = function(ts_data) {
+  if (is.ts(ts_data)) {
+    ts_data = tsibble::as_tsibble(ts_data, gather = FALSE) %>% rename(date = index) 
+  } 
+  ts_data = as_tibble(ts_data)
+  return(ts_data)
+}
 
+add_hf_lags = function(lf_data, hf_data, hf_variable = NULL, n_lags = 1, one_row = TRUE) {
 
-add_hf_lags = function(lf_data, hf_data, hf_variable, n_lags = 1, one_row = TRUE) {
+  # go from ts class to tsibble (dataframe)
+  lf_data = ts_2_tibble(lf_data)
+  hf_data = ts_2_tibble(hf_data)
+
+  # if not specified take all variables
+  if (is.null(hf_variable)) {
+    hf_variable = setdiff(colnames(hf_data), "date")
+  }
+  hf_data = select(hf_data, date, !!hf_variable) %>% na.omit() 
+  
   augmented_lf_data = mutate(lf_data, hf_obs = map(date, 
-                                                   ~ get_last_n_obs(hf_data = hf_data, hf_variable = hf_variable, ., n_lags = n_lags, one_row = one_row)))
+                ~ get_last_n_obs(hf_data = hf_data, ., n_lags = n_lags, one_row = one_row)))
   augmented_lf_data = unnest(augmented_lf_data)
   return(augmented_lf_data)
 }
 
 
 read_datastream = function(filename) {
-  data = import(filename, skip = 5)
-  data_cols = import(filename, skip = 4)
+  data = rio::import(filename, skip = 5)
+  data_cols = rio::import(filename, skip = 4)
   colnames(data) = colnames(data_cols)
   return(data)
 }
