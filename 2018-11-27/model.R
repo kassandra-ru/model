@@ -12,7 +12,7 @@ library(stringr) # character variables
 library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
 
-source(file = "functions.R")
+source(file = "../../kassandr/R/functions.R")
 
 
 Sys.setlocale("LC_TIME", "C")
@@ -22,15 +22,10 @@ Sys.setlocale("LC_TIME", "C")
 # load data ---------------------------------------------------------------
 
 cpi = import("data_snapshot/cpi_inflation.csv")
-gdp = import("data_snapshot/gdp.csv")
-gdp_deflator = import("data_snapshot/gdp_deflator.csv")
-gdp_real_2016_price = import("data_snapshot/gdp_real_2016_price.csv")
 
 rus_m = import("data_snapshot/russia_monthly.csv")
 rus_m_info = import("data_snapshot/russia_monthly_info.csv")
 
-rus_q = import("data_snapshot/russia_quarterly.csv")
-rus_q_info = import("data_snapshot/russia_quarterly_info.csv")
 
 
 # manually expect data ----------------------------------------------------
@@ -39,17 +34,10 @@ tail(cpi)
 head(cpi)
 glimpse(cpi)
 
-tail(gdp)
-head(gdp)
-glimpse(gdp)
 
 tail(rus_m)
 head(rus_m)
 glimpse(rus_m)
-
-tail(rus_q)
-head(rus_q)
-glimpse(rus_q)
 
 # data cleanup ------------------------------------------------------------
 
@@ -60,15 +48,6 @@ glimpse(rus_q)
 # character to dates
 # standartize dates to yyyy-mm-dd
 
-rus_q = tail(rus_q, -20)
-# rus_m = na.omit(rus_m)
-
-colnames(rus_q) = c("date", "gdp_nominal", "gdp_index", "household", "export", "import", "cpi", "ppi",
-                    "reer", "ir", "public_expen", "m2", "reserves", "oil_inc", "population2", 
-                    "real_wage", "employment", "population", "bicurrency", "y_real", "y_sa", "y_percap",
-                    "y_index", "c_real", "c_sa", "c_percap", "c_index", "cpi_inflation", 
-                    "reer_us", "reer_euro", "reer_weight", "bal_percap", "m_index", "infl_domestic",
-                    "real_wage_sa", "oil_inc_alt", "oil_inc_percap", "oil_inc_alt2")
 
 colnames(rus_m) = c("date", "empl_manuf", "ind_prod", "cpi_index", "ib_rate", "lend_rate", 
                     "real_income", "unempl", "ppi_index", "constr_nat", "inv_realcap", "real_wage",
@@ -77,31 +56,18 @@ colnames(rus_m) = c("date", "empl_manuf", "ind_prod", "cpi_index", "ib_rate", "l
                     "retail_index", "budget", "export", "import")
 
 cpi = mutate(cpi, date = ymd(date))
-gdp = mutate(gdp, date = ymd(date))
-gdp_deflator = mutate(gdp_deflator, date = ymd(date))
-gdp_real_2016_price = mutate(gdp_real_2016_price, date = ymd(date))
 
 rus_m = mutate(rus_m, date = as_date(yearmonth(date))) 
-rus_q = mutate(rus_q, date = yq(date)) 
 
 
-glimpse(rus_q)
 glimpse(rus_m)
 
 rus_m = left_join(cpi, rus_m, by = "date")
-rus_q = left_join(gdp, rus_q, by = "date")
-
-gdp_deflator = rename(gdp_deflator, gdp_deflator = value)
-gdp_real_2016_price = rename(gdp_real_2016_price, gdp_real_2016_price = value)
-rus_q = full_join(rus_q, gdp_deflator, by = "date")
-rus_q = full_join(rus_q, gdp_real_2016_price, by = "date")
 
 
 rus_m = mutate(rus_m, date = yearmonth(date))
-rus_q = mutate(rus_q, date = yearquarter(date))
 
 rus_m = as_tsibble(rus_m, index = date)
-rus_q = as_tsibble(rus_q, index = date)
 
 
 
@@ -124,8 +90,6 @@ vis_miss(rus_q)
 rus_m_full = select(rus_m, real_income, unempl, constr_nat, real_wage, rts_index, agric_index, retail_index, value)
 vis_miss(rus_m_full)
 
-rus_q_full = select(rus_q, value, access_date, ir, reserves, real_wage, population, gdp_deflator, gdp_real_2016_price)
-vis_miss(rus_q_full)
 
 # cpi univariate models -------------------------------------------------------
 
@@ -199,14 +163,16 @@ only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 
 # gdp univariate models -------------------------------------------------------
 
-
-rus_q_full = mutate(rus_q_full, gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
+tab6b = import("data_snapshot/tab6b_converted.csv")
+tab6b_tsibble = mutate(tab6b, date = yearquarter(date)) %>% as_tsibble(index = date)
+tab6b_tsibble = rename(tab6b_tsibble, gdp_real_2016_price = value) %>% mutate(gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
 # из-за того, что берём лаг 4 шага назад первое наблюдение появляется довольно поздно :)
 
-start_date = ymd("2012-01-01")
-rus_q_full_stable = filter(rus_q_full, date >= start_date)
+tab6b_tsibble %>% head()
+tab6b_tsibble %>% tail()
 
-rus_q_full_stable = rename(rus_q_full_stable, gdp_nominal = value, value = gdp_rate)
+start_date = ymd("2012-01-01")
+rus_q_full_stable = tab6b_tsibble %>% rename(value = gdp_rate) %>% filter(date >= start_date)
 
 
 # gdp quality evaluation --------------------------------------------------
