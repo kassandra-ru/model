@@ -199,13 +199,14 @@ only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 
 # gdp univariate models -------------------------------------------------------
 
-start_date = ymd("2011-10-01")
 
 rus_q_full = mutate(rus_q_full, gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
+# из-за того, что берём лаг 4 шага назад первое наблюдение появляется довольно поздно :)
 
+start_date = ymd("2012-01-01")
 rus_q_full_stable = filter(rus_q_full, date >= start_date)
-rus_q_full_stable = rename(rus_q_full_stable, gdp_nominal = value, value = gdp_rate)
 
+rus_q_full_stable = rename(rus_q_full_stable, gdp_nominal = value, value = gdp_rate)
 
 
 # gdp quality evaluation --------------------------------------------------
