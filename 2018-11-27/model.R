@@ -18,86 +18,17 @@ source(file = "../../kassandr/R/functions.R")
 Sys.setlocale("LC_TIME", "C")
 
 
-
-# load data ---------------------------------------------------------------
-
-cpi = import("data_snapshot/cpi_inflation.csv")
-
-rus_m = import("data_snapshot/russia_monthly.csv")
-rus_m_info = import("data_snapshot/russia_monthly_info.csv")
-
-
-
-# manually expect data ----------------------------------------------------
-
-tail(cpi)
-head(cpi)
-glimpse(cpi)
-
-
-tail(rus_m)
-head(rus_m)
-glimpse(rus_m)
-
-# data cleanup ------------------------------------------------------------
-
-# remove NA and duplicates by coincidence :)
-
-# better variable names
-
-# character to dates
-# standartize dates to yyyy-mm-dd
-
-
-colnames(rus_m) = c("date", "empl_manuf", "ind_prod", "cpi_index", "ib_rate", "lend_rate", 
-                    "real_income", "unempl", "ppi_index", "constr_nat", "inv_realcap", "real_wage",
-                    "m2", "rts_index", "reer_cpi", "gas_price", "trade_balance", "reserves_nongold", 
-                    "exch_rate_us", "worker_demand", "agric_index", 
-                    "retail_index", "budget", "export", "import")
-
-cpi = mutate(cpi, date = ymd(date))
-
-rus_m = mutate(rus_m, date = as_date(yearmonth(date))) 
-
-
-glimpse(rus_m)
-
-rus_m = left_join(cpi, rus_m, by = "date")
-
-
-rus_m = mutate(rus_m, date = yearmonth(date))
-
-rus_m = as_tsibble(rus_m, index = date)
-
-
-
-# plots -------------------------------------------------------------------
-head(rus_m)
-
-cpi_m_ts = ts(rus_m$value, frequency = 12, start = c(1991, 1))
-ggtsdisplay(cpi_m_ts)
-ggseasonplot(cpi_m_ts)
-
-
-vis_miss(rus_m)
-vis_miss(rus_q)
-
-
-# select full variables ---------------------------------------------------
-
-
-
-rus_m_full = select(rus_m, real_income, unempl, constr_nat, real_wage, rts_index, agric_index, retail_index, value)
-vis_miss(rus_m_full)
-
-
 # cpi univariate models -------------------------------------------------------
 
 start_date = ymd("2011-10-01")
 
-rus_m_full_stable = filter(rus_m_full, date >= start_date)
+I_ipc = import("data_snapshot/I_ipc_converted.csv")
+I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)
+rus_m_full_stable = filter(I_ipc_tsibble, date >= start_date, date <= "2018-10-30")
 
 
+rus_m_full_stable %>% tail()
+rus_m_full_stable %>% head()
 
 
 # cpi quality evaluation --------------------------------------------------
@@ -128,9 +59,9 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
                            "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
                            "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "lasso_fun", FALSE, "lasso_2_scalar_forecast",
-                           "ranger_fun", FALSE, "ranger_2_scalar_forecast")
+                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
+#                           "lasso_fun", FALSE, "lasso_2_scalar_forecast",
+#                           "ranger_fun", FALSE, "ranger_2_scalar_forecast")
 
 
 
@@ -142,7 +73,8 @@ cv_results_new = fill_duplicate_models(cv_res_models, cv_results)
 cv_results_new = add_point_forecasts(cv_results_new)
 mae_table = calculate_mae_table(cv_results_new)
 
-
+mae_table %>% tail()
+write_csv(mae_table, "mae_table_cpi_from_month_10.csv")
 
 
 # real forecasting....
@@ -157,7 +89,7 @@ the_forecasts_new = fill_duplicate_models(the_forecasts_fitted, the_forecasts)
 the_forecasts_new = add_point_forecasts(the_forecasts_new)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-# write_csv(only_numbers, path = "forecasts.csv")
+write_csv(only_numbers, path = "forecasts_cpi_from_month_10.csv")
 
 
 
