@@ -382,10 +382,16 @@ add_hf_lags = function(lf_data, hf_data, hf_variable = NULL, n_lags = 1, one_row
 }
 
 
-read_datastream = function(filename) {
+read_datastream = function(filename, correct_names = TRUE) {
   data = rio::import(filename, skip = 5)
   data_cols = rio::import(filename, skip = 4)
   colnames(data) = colnames(data_cols)
+  
+  if (correct_names) {
+    colnames(data) = str_replace_all(colnames(data), "\\.", "_")
+    colnames(data) = str_replace_all(colnames(data), "%", "p")
+  }  
+  
   return(data)
 }
 
