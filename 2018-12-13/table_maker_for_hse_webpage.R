@@ -45,7 +45,7 @@ mae_wide = spread(mae_post, key = model_fun, value = mae)
 write_csv2_cp1251(mae_wide, "mae_gdp_wide.csv")
 
 forecast_table = import("forecasts_gdp_rate_real.csv")
-forecast_post = mutate(forecast_table, point_forecast = round(point_forecast, 2)) %>% 
+forecast_post = mutate(forecast_table, point_forecast = round(point_forecast, 3)) %>% 
   mutate(date = case_when(date == "2018-10-01" ~ "IV квартал 2018",
                           date == "2019-01-01" ~ "I квартал 2019",
                           date == "2019-04-01" ~ "II квартал 2019"))
