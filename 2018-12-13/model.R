@@ -90,7 +90,7 @@ the_forecasts_new = fill_duplicate_models(the_forecasts_fitted, the_forecasts)
 the_forecasts_new = add_point_forecasts(the_forecasts_new)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-write_csv(only_numbers, path = "forecasts.csv")
+write_csv(only_numbers, path = "forecasts_cpi.csv")
 
 
 
