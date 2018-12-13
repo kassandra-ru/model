@@ -12,6 +12,7 @@ library(stringr) # character variables
 library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
 
+library(kassandr)
 source(file = "../../kassandr/R/functions.R")
 
 
@@ -24,7 +25,7 @@ start_date = ymd("2011-10-01")
 
 I_ipc = import("data_snapshot/I_ipc_converted.csv")
 I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)
-rus_m_full_stable = filter(I_ipc_tsibble, date >= start_date, date <= "2018-10-30")
+rus_m_full_stable = filter(I_ipc_tsibble, date >= start_date)
 
 
 rus_m_full_stable %>% tail()
@@ -74,7 +75,7 @@ cv_results_new = add_point_forecasts(cv_results_new)
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table %>% tail()
-write_csv(mae_table, "mae_table_cpi_from_month_10.csv")
+write_csv(mae_table, "mae_table_cpi.csv")
 
 
 # real forecasting....
@@ -89,7 +90,7 @@ the_forecasts_new = fill_duplicate_models(the_forecasts_fitted, the_forecasts)
 the_forecasts_new = add_point_forecasts(the_forecasts_new)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-write_csv(only_numbers, path = "forecasts_cpi_from_month_10.csv")
+write_csv(only_numbers, path = "forecasts.csv")
 
 
 
@@ -141,7 +142,7 @@ cv_results_new = add_point_forecasts(cv_results_new)
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table
-# write_csv(mae_table, "mae_table_gdp_rate_real.csv")
+write_csv(mae_table, "mae_table_gdp_rate_real.csv")
 
 # real forecasting....
 
@@ -155,7 +156,7 @@ the_forecasts_new = add_point_forecasts(the_forecasts_new)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 only_numbers
-# write_csv(only_numbers, path = "forecasts_gdp_rate_real.csv")
+write_csv(only_numbers, path = "forecasts_gdp_rate_real.csv")
 
 
 
