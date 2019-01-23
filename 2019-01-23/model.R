@@ -13,7 +13,7 @@ library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
 
 library(kassandr)
-source(file = "../../kassandr/R/functions.R")
+# devtools::install_github("kassandra-ru/kassandr")
 
 
 Sys.setlocale("LC_TIME", "C")
@@ -69,9 +69,8 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
                                 window_type = window_type, series_data = rus_m_full_stable)
-cv_res_models = estimate_nonduplicate_models(cv_results)
-cv_results_new = fill_duplicate_models(cv_res_models, cv_results)
-cv_results_new = add_point_forecasts(cv_results_new)
+cv_results_new = estimate_and_forecast(cv_results)
+
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table %>% tail()
@@ -85,9 +84,8 @@ write_csv(mae_table, "mae_table_cpi.csv")
 # models in tibble version ------------------------------------------------
 
 the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable)
-the_forecasts_fitted = estimate_nonduplicate_models(the_forecasts)
-the_forecasts_new = fill_duplicate_models(the_forecasts_fitted, the_forecasts)
-the_forecasts_new = add_point_forecasts(the_forecasts_new)
+
+the_forecasts_new = estimate_and_forecast(the_forecasts)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 write_csv(only_numbers, path = "forecasts_cpi.csv")
@@ -136,9 +134,7 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
                                 window_type = window_type, series_data = rus_q_full_stable)
-cv_res_models = estimate_nonduplicate_models(cv_results)
-cv_results_new = fill_duplicate_models(cv_res_models, cv_results)
-cv_results_new = add_point_forecasts(cv_results_new)
+cv_results_new = estimate_and_forecast(cv_results)
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table
@@ -150,9 +146,7 @@ write_csv(mae_table, "mae_table_gdp_rate_real.csv")
 # models in tibble version ------------------------------------------------
 
 the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_q_full_stable)
-the_forecasts_fitted = estimate_nonduplicate_models(the_forecasts)
-the_forecasts_new = fill_duplicate_models(the_forecasts_fitted, the_forecasts)
-the_forecasts_new = add_point_forecasts(the_forecasts_new)
+the_forecasts_new = estimate_and_forecast(the_forecasts)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 only_numbers
