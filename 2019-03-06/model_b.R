@@ -30,11 +30,10 @@ export(exch_rate, "data_snapshot/exchangerate_m.csv")
 
 # load all monthly 
 
-files_monthly = c("1-03.csv", "1-08.csv", "1-11.csv", "exchangerate_m.csv", 
+rus_m = tibble(file = c("1-03.csv", "1-08.csv", "1-11.csv", "exchangerate_m.csv", 
                   "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv", 
-                  "reserverate.csv", "tab5a.csv", "tab6b.csv", "tab9.csv", "tab9a.csv", 
-                  "trade.csv", "urov_12kv.csv")
-
+                  "reserves.csv", "trade.csv", "urov_12kv.csv"))
+rus_m = mutate(rus_m, data = map(file, ~ rio::import(paste0("data_snapshot/", .))))
 
 # cpi univariate models -------------------------------------------------------
 
