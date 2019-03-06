@@ -1,0 +1,16 @@
+I_ipc = import("data_snapshot/i_ipc.csv")
+head(I_ipc)
+I_ipc_ts <- ts(select(I_ipc,2), start = c(1991,1), freq = 12)
+I_ipc_test <- window(I_ipc_ts, start = c(2011, 10), end = c(2017,12))
+ggAcf(I_ipc_test)
+ggPacf(I_ipc_test)
+
+ind_prod = import("data_snapshot/ind_okved2.csv")
+head(ind_prod)
+ind_prod_ts <- ts(select(ind_prod,2), start = c(2013,1), freq = 12)
+ind_prod_test <- window(ind_prod_ts, start = c(2013, 1), end = c(2017,12))
+ggAcf(ind_prod_test)
+ggPacf(ind_prod_test)
+ggAcf(diff(ind_prod_test, lag = 12))
+ggPacf(diff(ind_prod_test, lag = 12))
+
