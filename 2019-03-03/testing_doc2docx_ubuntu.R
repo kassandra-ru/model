@@ -6,9 +6,18 @@ add_on = "-env:LD_LIBRARY_PATH=:/usr/lib/libreoffice/program:/usr/lib/x86_64-lin
 
 cmd <- sprintf("\"%s\" --convert-to docx:\"MS Word 2007 XML\" --headless --outdir \"%s\" \"%s\"", 
                lo_path, docx_dir, doc_file)
-cat(cmd)
-system(cmd, intern = TRUE)
 
+cmd2 <- sprintf('%s --convert-to docx:"MS Word 2007 XML" --headless --outdir %s %s', 
+               lo_path, docx_dir, doc_file)
+
+cat(cmd)
+cat(cmd2)
+
+
+system(cmd, intern = TRUE)
+system(cmd2, intern = TRUE)
+
+?system
 
 library(docxtractr)
 set_libreoffice_path("/usr/bin/libreoffice")
