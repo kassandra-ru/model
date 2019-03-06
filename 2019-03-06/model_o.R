@@ -192,7 +192,7 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
                            "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
                            "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
+                           "arima111_fun", TRUE, "uni_model_2_scalar_forecast")
 #                           "lasso_fun", FALSE, "lasso_2_scalar_forecast",
 #                           "ranger_fun", FALSE, "ranger_2_scalar_forecast")
 

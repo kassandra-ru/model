@@ -1,4 +1,4 @@
- Sys.setenv("TAR" = "internal") # If the following command does not 
+Sys.setenv("TAR" = "internal") # If the following command does not 
 # work on Windows OS. 
 devtools::install_github("kassandra-ru/kassandr")
 
