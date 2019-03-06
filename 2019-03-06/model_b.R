@@ -18,7 +18,7 @@ library(kassandr)
 
 Sys.setlocale("LC_TIME", "C")
 
-# aggregate exchange rate ----------------------------------------------------
+# aggregate exchange rate: from dayly to monthly ----------------------------------------------------
 
 exch_rate_dayly = import("data_snapshot/exchangerate.csv")
 exch_rate_dayly %>% glimpse()
@@ -27,6 +27,15 @@ exch_rate = exch_rate_dayly %>% arrange(date) %>% group_by(year, month) %>% summ
 exch_rate = ungroup(exch_rate) %>% mutate(date = ymd(paste0(year, "-", month, "-01"))) %>% select(-year, -month)
 
 export(exch_rate, "data_snapshot/exchangerate_m.csv")
+
+# load all monthly 
+
+files_monthly = c("1-03.csv", "1-08.csv", "1-11.csv", "exchangerate_m.csv", 
+                  "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv", 
+                  "reserverate.csv", "tab5a.csv", "tab6b.csv", "tab9.csv", "tab9a.csv", 
+                  "trade.csv", "urov_12kv.csv")
+
+
 # cpi univariate models -------------------------------------------------------
 
 start_date = ymd("2011-10-01")
