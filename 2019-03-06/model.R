@@ -13,7 +13,7 @@ library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
 
 library(kassandr)
-#devtools::install_github("kassandra-ru/kassandr")
+# devtools::install_github("kassandra-ru/kassandr")
 
 
 Sys.setlocale("LC_TIME", "C")
@@ -74,7 +74,7 @@ cv_results_new = estimate_and_forecast(cv_results)
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table %>% tail()
-write_csv(mae_table, "mae_table_cpi.csv")
+write_csv(mae_table, "estimation_results/mae_table_cpi.csv")
 
 
 # real forecasting....
@@ -88,7 +88,7 @@ the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_
 the_forecasts_new = estimate_and_forecast(the_forecasts)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-write_csv(only_numbers, path = "forecasts_cpi.csv")
+write_csv(only_numbers, path = "estimation_results/forecasts_cpi.csv")
 
 
 
@@ -138,7 +138,7 @@ cv_results_new = estimate_and_forecast(cv_results)
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table
-write_csv(mae_table, "mae_table_gdp_rate_real.csv")
+write_csv(mae_table, "estimation_results/mae_table_gdp_rate_real.csv")
 
 # real forecasting....
 
@@ -150,7 +150,7 @@ the_forecasts_new = estimate_and_forecast(the_forecasts)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 only_numbers
-write_csv(only_numbers, path = "forecasts_gdp_rate_real.csv")
+write_csv(only_numbers, path = "estimation_results/forecasts_gdp_rate_real.csv")
 
 
 
