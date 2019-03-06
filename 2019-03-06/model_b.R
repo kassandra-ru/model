@@ -18,7 +18,15 @@ library(kassandr)
 
 Sys.setlocale("LC_TIME", "C")
 
+# aggregate exchange rate ----------------------------------------------------
 
+exch_rate_dayly = import("data_snapshot/exchangerate.csv")
+exch_rate_dayly %>% glimpse()
+exch_rate_dayly = select(exch_rate_dayly, -access_date) %>% mutate(date = ymd(date), year = year(date), month = month(date))
+exch_rate = exch_rate_dayly %>% arrange(date) %>% group_by(year, month) %>% summarise(exch_rate = last(exch_rate))
+exch_rate = ungroup(exch_rate) %>% mutate(date = ymd(paste0(year, "-", month, "-01"))) %>% select(-year, -month)
+
+export(exch_rate, "data_snapshot/exchangerate_m.csv")
 # cpi univariate models -------------------------------------------------------
 
 start_date = ymd("2011-10-01")
