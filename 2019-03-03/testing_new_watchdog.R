@@ -1,3 +1,5 @@
+ Sys.setenv("TAR" = "internal") # If the following command does not 
+# work on Windows OS. 
 devtools::install_github("kassandra-ru/kassandr")
 
 library(kassandr)
@@ -11,7 +13,8 @@ set_libreoffice_path("/usr/bin/libreoffice")  # macos
 set_libreoffice_path("C:/Program Files/LibreOffice/program/soffice.exe")  # windows
 
 
-path = "~/Documents/kassandra/data/raw/"
+#path = "~/Documents/kassandra/data/raw/"
+path = "D:/Research/Kassandra/data/raw/"
 
 
 watchdog_file = paste0(path, "watchdog.csv")
@@ -33,4 +36,4 @@ download_log_new = download_statistics(path, watchdog)
 # second and more:
 download_log = import(download_log_file) %>% mutate(access_date = ymd(access_date))
 download_log = bind_rows(download_log, download_log_new)
-export(download_log, download_log_file)
+#export(download_log, download_log_file)
