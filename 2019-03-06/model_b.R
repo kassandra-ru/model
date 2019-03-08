@@ -11,6 +11,7 @@ library(ranger) # random forest
 library(stringr) # character variables
 library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
+library(tidyr) # 
 
 library(kassandr)
 # devtools::install_github("kassandra-ru/kassandr")
@@ -34,6 +35,17 @@ rus_m = tibble(file = c("1-03.csv", "1-08.csv", "1-11.csv", "exchangerate_m.csv"
                   "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv", 
                   "reserves.csv", "trade.csv", "urov_12kv.csv"))
 rus_m = mutate(rus_m, data = map(file, ~ rio::import(paste0("data_snapshot/", .))))
+rus_m = mutate(rus_m, data = map(data, ~ rename_index_to_date(.)))
+
+rus_m_unnested = unnest(rus_m)
+
+rus_m2 = mutate(rus_m, colnames = map(data, ~ colnames(.)))
+rus_m2_unnest = select(rus_m2, -data) %>% unnest()
+
+rename_index_to_date = function(d_frame) {
+  colnames(d_frame)[colnames(d_frame) == "index"] = "date"
+  return(d_frame)
+}
 
 # cpi univariate models -------------------------------------------------------
 
