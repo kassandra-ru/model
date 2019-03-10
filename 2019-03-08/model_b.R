@@ -1,12 +1,12 @@
 library(tidyverse) # data manipulation
 library(rio) # import - export data
 library(tsibble) # ts data frames
-#library(fable) # forecasting models
+library(fable) # forecasting models
 library(forecast) # forecasting models
 library(lubridate) # working with dates
 library(glmnet) # lasso
 library(naniar) # missing values visualization
-# library(fasster) # fasster model
+library(fasster) # fasster model
 library(ranger) # random forest
 library(stringr) # character variables
 library(rlang) # шаманство с бум-бум!
@@ -15,7 +15,8 @@ library(tidyr) #
 
 library(kassandr)
 # devtools::install_github("kassandra-ru/kassandr")
-
+# devtools::install_github("tidyverts/fasster")
+# devtools::install_github("tidyverts/fable")
 
 Sys.setlocale("LC_TIME", "C")
 
@@ -47,6 +48,19 @@ rus_ts %>% export("rus_monthly.csv")
 
 
 # cpi univariate models -------------------------------------------------------
+
+
+fit = rus_ts %>% model(
+  fasster = FASSTER(cpi ~ trig(12) + poly(1))
+)
+
+
+
+fit <- USAccDeaths %>% 
+  as_tsibble %>% 
+  model(fasster = FASSTER(value ~ poly(1) + trig(12)))
+fit %>% summary
+
 
 start_date = ymd("2011-10-01")
 
