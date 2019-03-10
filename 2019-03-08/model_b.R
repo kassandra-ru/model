@@ -47,22 +47,70 @@ rus_ts %>% export("rus_monthly.csv")
 
 
 
-# cpi univariate models -------------------------------------------------------
+
+# fasster -----------------------------------------------------------------
+rus_ts = import("rus_monthly.csv") %>% mutate(date = yearmonth(ymd(date)))
+rus_ts = as_tsibble(rus_ts, index = date) %>% filter(date <= "2019-01-15")
 
 
 fit = rus_ts %>% model(
-  fasster = FASSTER(cpi ~ trig(12) + poly(1))
+  # fasster = FASSTER(cpi ~ trig(12) + poly(1)),
+  ets = ETS(cpi)
+  # arima = ARIMA(cpi)
 )
 
+fit %>% forecast()
+
+fit %>% forecast(h = 12)
 
 
 fit <- USAccDeaths %>% 
   as_tsibble %>% 
   model(fasster = FASSTER(value ~ poly(1) + trig(12)))
-fit %>% summary
+fit  %>% forecast()
+
+
+fit <- tsibbledata::UKLungDeaths %>%
+  model(fasster = FASSTER(fdeaths ~ mdeaths))
+
+
+
+elec_tr <- tsibbledata::elecdemand %>%
+  dplyr::filter(index < lubridate::ymd("2014-03-01"))
+
+elec_fit <- elec_tr %>%
+  model(
+    fasster = fasster(log(Demand) ~ 
+                        WorkDay %S% (trig(48, 16) + poly(1)) + Temperature + I(Temperature^2)
+    )
+  )
+
+elec_ts <- tsibbledata::elecdemand %>%
+  filter(index >= lubridate::ymd("2014-03-01"),
+         index < lubridate::ymd("2014-04-01")) %>% 
+  select(-Demand)
+elec_fit %>% 
+  forecast(new_data = elec_ts) %>% 
+  autoplot(elec_tr)
+
+elec_fit %>% forecast() %>% autoplot()
+
+
+
+fit <- USAccDeaths %>% 
+  as_tsibble() %>% 
+  model(fasster = FASSTER(value ~ poly(1) + trig(12)))
+fit %>% 
+  fablelite::forecast(h = 24) %>% autoplot(as_tsibble(USAccDeaths))
+
+# cpi univariate models -------------------------------------------------------
 
 
 start_date = ymd("2011-10-01")
+
+
+
+
 
 I_ipc = import("data_snapshot/i_ipc.csv")
 I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)

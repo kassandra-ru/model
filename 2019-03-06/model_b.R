@@ -51,9 +51,9 @@ rename_index_to_date = function(d_frame) {
 
 start_date = ymd("2011-10-01")
 
-I_ipc = import("data_snapshot/i_ipc.csv")
-I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)
-rus_m_full_stable = filter(I_ipc_tsibble, date >= start_date)
+i_ipc = import("../../data/raw/2019-03-10/i_ipc.csv")
+i_ipc_tsibble = mutate(i_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)
+rus_m_full_stable = filter(i_ipc_tsibble, date >= start_date) 
 
 
 rus_m_full_stable %>% tail()
@@ -96,7 +96,7 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 
 cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
-                                window_type = window_type, series_data = rus_m_full_stable)
+                                window_type = window_type, series_data = rus_m_full_stable, target = "cpi")
 cv_results_new = estimate_and_forecast(cv_results)
 
 mae_table = calculate_mae_table(cv_results_new)
@@ -111,7 +111,7 @@ write_csv(mae_table, "estimation_results/mae_table_cpi.csv")
 
 # models in tibble version ------------------------------------------------
 
-the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable)
+the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable, target = "cpi")
 
 the_forecasts_new = estimate_and_forecast(the_forecasts)
 
