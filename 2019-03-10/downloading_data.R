@@ -8,8 +8,8 @@ library(rio)
 library(lubridate)
 library(docxtractr)
 
-set_libreoffice_path("/usr/bin/libreoffice")  # ubuntu
-set_libreoffice_path("/usr/bin/libreoffice")  # macos
+#set_libreoffice_path("/usr/bin/libreoffice")  # ubuntu
+#set_libreoffice_path("/usr/bin/libreoffice")  # macos
 set_libreoffice_path("C:/Program Files/LibreOffice/program/soffice.exe")  # windows
 
 

@@ -23,8 +23,8 @@ Sys.setlocale("LC_TIME", "C")
 
 start_date = ymd("2011-10-01")
 
-I_ipc = import("data_snapshot/i_ipc.csv")
-I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)
+I_ipc = import("../../data/raw/2019-03-10/i_ipc.csv")
+I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)%>%rename(value = cpi)
 rus_m_full_stable = filter(I_ipc_tsibble, date >= start_date)
 
 
@@ -95,7 +95,7 @@ write_csv(only_numbers, path = "estimation_results/forecasts_cpi.csv")
 # gdp univariate models -------------------------------------------------------
 
 tab6b = import("data_snapshot/tab6b.csv")
-tab6b_tsibble = mutate(tab6b, date = yearquarter(date)) %>% as_tsibble(index = date)
+tab6b_tsibble = mutate(tab6b, date = yearquarter(date)) %>% as_tsibble(index = date)%>%rename(value = )
 tab6b_tsibble = rename(tab6b_tsibble, gdp_real_2016_price = value) %>% mutate(gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
 # из-за того, что берём лаг 4 шага назад первое наблюдение появляется довольно поздно :)
 
