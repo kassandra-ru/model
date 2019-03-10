@@ -7,6 +7,7 @@ library(lubridate)
 library(docxtractr)
 
 set_libreoffice_path("/usr/bin/libreoffice")  # ubuntu
+Sys.setenv(LD_LIBRARY_PATH = "/usr/lib/libreoffice/program/") # ubuntu
 # set_libreoffice_path("/usr/bin/libreoffice")  # macos
 # set_libreoffice_path("C:/Program Files/LibreOffice/program/soffice.exe")  # windows
 
