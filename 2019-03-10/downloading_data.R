@@ -1,6 +1,6 @@
-Sys.setenv("TAR" = "internal") # If the following command does not 
+#Sys.setenv("TAR" = "internal") # If the following command does not 
 # work on Windows OS. 
-devtools::install_github("kassandra-ru/kassandr")
+#devtools::install_github("kassandra-ru/kassandr")
 
 library(kassandr)
 library(tidyverse)
@@ -26,14 +26,4 @@ watchdog = import(watchdog_file)
 # download_log_first = watchdog %>% mutate(access_date = Sys.Date(), access_status = NA, hash_raw = NA, hash_main = NA) %>% head(0)
 # export(download_log_first, download_log_file)
 
-
-
 download_log_new = download_statistics(path, watchdog)
-
-# first time:
-# export(download_log_new, download_log_file)
-
-# second and more:
-download_log = import(download_log_file) %>% mutate(access_date = ymd(access_date))
-download_log = bind_rows(download_log, download_log_new)
-#export(download_log, download_log_file)
