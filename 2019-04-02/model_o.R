@@ -13,7 +13,7 @@ library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
 
 library(kassandr)
-# devtools::install_github("kassandra-ru/kassandr")
+#devtools::install_github("kassandra-ru/kassandr")
 
 
 Sys.setlocale("LC_TIME", "C")
@@ -88,6 +88,7 @@ the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_
 the_forecasts_new = estimate_and_forecast(the_forecasts)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
+
 write_csv(only_numbers, path = "estimation_results/forecasts_cpi.csv")
 
 
@@ -224,7 +225,7 @@ only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 write_csv(only_numbers, path = "estimation_results/forecasts_ind_prod.csv")
 
 
-# investments univariate models -------------------------------------------------------
+# industrial product univariate models -------------------------------------------------------
 
 start_date = ymd("2013-01-01")
 
@@ -284,8 +285,6 @@ write_csv(mae_table, "estimation_results/mae_table_ind_prod.csv")
 
 # real forecasting....
 
-
-
 # models in tibble version ------------------------------------------------
 
 the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable)
@@ -294,4 +293,68 @@ the_forecasts_new = estimate_and_forecast(the_forecasts)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 write_csv(only_numbers, path = "estimation_results/forecasts_ind_prod.csv")
+
+
+# investment univariate models -------------------------------------------------------
+
+tab6b = import("../../data/raw/2019-04-03/tab6b.csv")
+tab6b_tsibble = mutate(tab6b, date = yearquarter(date)) %>% as_tsibble(index = date)%>%rename(value = gdp_2016_price)
+tab6b_tsibble = rename(tab6b_tsibble, gdp_real_2016_price = value) %>% mutate(gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
+# из-за того, что берём лаг 4 шага назад первое наблюдение появляется довольно поздно :)
+
+tab6b_tsibble %>% head()
+tab6b_tsibble %>% tail()
+
+start_date = ymd("2012-01-01")
+rus_q_full_stable = tab6b_tsibble %>% rename(value = gdp_rate) %>% filter(date >= start_date)
+
+
+# gdp quality evaluation --------------------------------------------------
+
+# TODO: rename test to eval
+
+proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
+
+nobs_full = nrow(rus_q_full_stable)
+nobs_test = round(proportion_test * nobs_full)
+
+window_type = "sliding" # "sliding" or "stretching" as in tsibble
+
+dates_test = tail(rus_q_full_stable$date, nobs_test)
+
+h_all = 1:3
+
+
+model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
+                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
+                           "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
+                           "arima_fun", TRUE, "uni_model_2_scalar_forecast",
+                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
+
+
+
+# TODO: exact ML in case where ARMA(1,1)-SARMA(1,1) fails
+
+cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
+                                window_type = window_type, series_data = rus_q_full_stable)
+cv_results_new = estimate_and_forecast(cv_results)
+mae_table = calculate_mae_table(cv_results_new)
+
+mae_table
+write_csv(mae_table, "estimation_results/mae_table_gdp_rate_real.csv")
+
+# real forecasting....
+
+
+# models in tibble version ------------------------------------------------
+
+the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_q_full_stable)
+the_forecasts_new = estimate_and_forecast(the_forecasts)
+
+only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
+only_numbers
+write_csv(only_numbers, path = "estimation_results/forecasts_gdp_rate_real.csv")
+
+
+
 
