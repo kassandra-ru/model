@@ -37,6 +37,20 @@ daily_to_monthly = function(daily_tsibble) {
   return(monthly_tsibble)
 }
 
+# file_name - vector of file names
+# read all csv files and join them in a huge tsibble :)
+join_ts_files = function(file_name) {
+  all_data = tibble(file_name = file_name)
+  all_data = mutate(all_data, data = map(file, ~ rio::import(.)))
+  all_data = mutate(all_data, data = map(data, ~ dplyr::select(.x, -access_date)))
+  
+  all_frame = all_data$data %>% reduce(full_join, by = "date") %>% arrange(date) %>% mutate(date = yearmonth(ymd(date)))
+  
+  all_tsibble = as_tsibble(all_frame, index = date)
+  return(all_tsibble)
+}
+
+
 # aggregate exchange rate: from dayly to monthly ----------------------------------------------------
 
 exch_rate_daily = import(paste0(raw_data_folder, "exchangerate.csv"))
@@ -44,18 +58,92 @@ exch_rate = daily_to_monthly(exch_rate_daily)
 exch_rate
 export(exch_rate, file = paste0(data_snapshot_folder, "exchangerate_m.csv"))
 
-# load all monthly
 
-rus_m = tibble(file = c(paste0(raw_data_folder, c("1-03.csv", "1-08.csv", "1-11.csv",
-                        "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv",
-                        "reserves.csv", "trade.csv", "urov_12kv.csv")), paste0(data_snapshot_folder, "exchangerate_m.csv")))
-rus_m = mutate(rus_m, data = map(file, ~ rio::import(.)))
-rus_m = mutate(rus_m, data = map(data, ~ dplyr::select(.x, -access_date)))
 
-rus_all = rus_m$data %>% reduce(full_join, by = "date") %>% arrange(date) %>% mutate(date = yearmonth(ymd(date)))
+# join all small files into big table -------------------------------------
 
-rus_ts = rus_all %>% as_tsibble(index = date)
+
+file = c(paste0(raw_data_folder, c("1-03.csv", "1-08.csv", "1-11.csv",
+                                   "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv",
+                                   "reserves.csv", "trade.csv", "urov_12kv.csv")), 
+         paste0(data_snapshot_folder, "exchangerate_m.csv"))
+file
+rus_ts = join_ts_files(file)
 export(rus_ts, file = paste0(data_snapshot_folder, "rus_monthly.csv"))
+
+
+
+# create model table ------------------------------------------------------
+
+model_list = tribble(~model, ~equation, ~options, ~h,
+                     "arima", "cpi", "", "1,2,3,4,5,6",
+                     "ets", "ind_prod", "", "1,2,3,4,5,6",
+                     "arima", "cpi", "order=c(1,0,1),seasonal=c(1,1,1),method='ML'", "1,2,3,4,5,6",
+                     "var", "cpi+ind_prod", "p=5", "1,2,3,4,5,6",
+                     "arima", "cpi~lag2_ind_prod", "order=c(1,0,1),seasonal=c(1,1,1)", "1,2",
+                     "ranger", "cpi~lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
+                     "tbats", "cpi", "", "1,2,3,4,5,6")
+model_list
+
+# здесь можно дописать конструктор model_list который по h подбирает лаги
+# типа lah0 = lag1 при h=1 и lag2 при h=2
+# TODO: подумать, а надо ли оно
+
+# acronyms act on equation(+) and options(?)
+acronyms = tribble(~acronym, ~meaning,
+                   "FOURIER_M", "s1_12+s2_12+s3_12+s4_12+s5_12+c1_12+c2_12+c3_12+c4_12+c5_12+c6_12",
+                   "FOURIER_Q", "s1_4+c1_4+c2_4",
+                   "TRENDS", "trend_lin+trend_root")
+
+first_useful_date = ymd("2011-10-01") # all previous info will be ignored
+forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment of time
+proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
+
+window_type = "sliding" # "sliding" or "stretching" as called in tsibble
+
+
+# forecasting_dot ---------------------------------------------------------
+
+# здесь мы составляем список точек прогнозирования. 
+# одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
+
+model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
+
+
+# STOPPED here
+
+  
+# augment_dataset ---------------------------------------------------------
+
+# add h_max new lines at the end
+# add a lot of lags for each variable, trend, fourier cos/sin
+augment_tsibble_4_forecasting = function(original_tsibble, lags = 0:(2*frequency(original_tsibble)), h_max = 1) {
+  
+  message("Augmenting data set")
+  augmented_tsibble = tsibble::append_row(original_tsibble, n = h_max)
+  
+  message("Add lags ", lags, " for each variable")
+  
+  var_names = setdiff(colnames(original_tsibble), c("date", "access_date"))
+  augmented_tsibble = add_lags(augmented_tsibble, var_names, lags = lags)
+  
+  message("Adding trend and periodic coefficients")
+  augmented_tsibble = add_fourier(augmented_tsibble) %>% add_trend()
+  
+  return(augmented_tsibble)
+}
+
+
+
+
+wide_ts = augment_tsibble_4_forecasting(rus_ts)
+
+  
+  
+  
+
+
+
 
 
 
