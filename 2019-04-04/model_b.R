@@ -1,3 +1,6 @@
+# devtools::install_github("kassandra-ru/kassandr")
+library(kassandr)
+
 library(tidyverse) # data manipulation
 library(rio) # import - export data
 library(tsibble) # ts data frames
@@ -12,11 +15,51 @@ library(stringr) # character variables
 library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
 
-library(kassandr)
-# devtools::install_github("kassandra-ru/kassandr")
-
 
 Sys.setlocale("LC_TIME", "C")
+
+
+## important!
+# Do Session - Set working directory - to source file location
+
+raw_data_folder = "../../data/raw/2019-04-04/"
+
+data_snapshot_folder = "data_snapshot/"
+dir.create(data_snapshot_folder)
+
+
+# daily tsibble should contain date, access_date and more columns!
+# the last (!) value for each month will be used (!)
+daily_to_monthly = function(daily_tsibble) {
+  daily_tsibble = mutate(daily_tsibble, date = lubridate::ymd(date), .year = year(date), .month = month(date))
+  monthly_tsibble = arrange(daily_tsibble, date) %>% group_by(.year, .month) %>% filter(date == last(date))
+  monthly_tsibble = ungroup(monthly_tsibble) %>% mutate(date = ymd(paste0(.year, "-", .month, "-01"))) %>% select(-.year, -.month)
+  return(monthly_tsibble)
+}
+
+# aggregate exchange rate: from dayly to monthly ----------------------------------------------------
+
+exch_rate_daily = import(paste0(raw_data_folder, "exchangerate.csv"))
+exch_rate = daily_to_monthly(exch_rate_daily)
+exch_rate
+export(exch_rate, file = paste0(data_snapshot_folder, "exchangerate_m.csv"))
+
+# load all monthly
+
+rus_m = tibble(file = c(paste0(raw_data_folder, c("1-03.csv", "1-08.csv", "1-11.csv",
+                        "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv",
+                        "reserves.csv", "trade.csv", "urov_12kv.csv")), paste0(data_snapshot_folder, "exchangerate_m.csv")))
+rus_m = mutate(rus_m, data = map(file, ~ rio::import(.)))
+rus_m = mutate(rus_m, data = map(data, ~ dplyr::select(.x, -access_date)))
+
+rus_all = rus_m$data %>% reduce(full_join, by = "date") %>% arrange(date) %>% mutate(date = yearmonth(ymd(date)))
+
+rus_ts = rus_all %>% as_tsibble(index = date)
+export(rus_ts, file = paste0(data_snapshot_folder, "rus_monthly.csv"))
+
+
+
+
 
 
 # cpi univariate models -------------------------------------------------------
