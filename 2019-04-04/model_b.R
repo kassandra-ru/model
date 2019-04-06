@@ -103,7 +103,34 @@ forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment 
 proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
 
 window_type = "sliding" # "sliding" or "stretching" as called in tsibble
-h_max = pull(model_list, h) %>% str_split(",") %>% unlist() %>% as.numeric() %>% max()
+
+
+
+# precalculated vectors and consts ----------------------------------------
+
+all_h = pull(model_list, h) %>% str_split(",") %>% unlist() %>% as.numeric() %>% unique()
+h_max = all_h %>% max()
+
+predictors = pull(model_list, predictors) %>% str_split("[\\+,]") %>% unlist() %>% unique()
+predictors
+
+# unabbreviate
+
+
+unabbreviate_vector = function(original_vector, acronyms) {
+  full_vector = original_vector
+  for (acro_no in 1:nrow(acronyms)) {
+    full_vector = stringr::str_replace_all(full_vector, acronyms$acronym[acro_no], acronyms$meaning[acro_no])
+  }
+  return(full_vector)
+}
+
+unabbreviate_tibble = function(original_tibble, acronyms, columns) {
+  full_tibble = mutate_at(original_tibble, .vars = columns, ~unabbreviate_vector(., acronyms))
+  return(full_tibble)
+}
+
+unabbreviate_tibble(model_list, acronyms, columns = "predictors")
 
 # forecasting_dot ---------------------------------------------------------
 
