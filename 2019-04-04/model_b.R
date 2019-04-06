@@ -97,6 +97,7 @@ acronyms = tribble(~acronym, ~meaning,
                    "FOURIER_M", "s1_12+s2_12+s3_12+s4_12+s5_12+c1_12+c2_12+c3_12+c4_12+c5_12+c6_12",
                    "FOURIER_Q", "s1_4+c1_4+c2_4",
                    "TRENDS", "trend_lin+trend_root")
+acronyms
 
 first_useful_date = ymd("2011-10-01") # all previous info will be ignored
 forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment of time
@@ -106,15 +107,7 @@ window_type = "sliding" # "sliding" or "stretching" as called in tsibble
 
 
 
-# precalculated vectors and consts ----------------------------------------
-
-all_h = pull(model_list, h) %>% str_split(",") %>% unlist() %>% as.numeric() %>% unique()
-h_max = all_h %>% max()
-
-predictors = pull(model_list, predictors) %>% str_split("[\\+,]") %>% unlist() %>% unique()
-predictors
-
-# unabbreviate
+# unabbreviate functions ---------------------------------------------------------
 
 
 unabbreviate_vector = function(original_vector, acronyms) {
@@ -132,16 +125,25 @@ unabbreviate_tibble = function(original_tibble, acronyms, columns) {
 
 unabbreviate_tibble(model_list, acronyms, columns = "predictors")
 
-# forecasting_dot ---------------------------------------------------------
 
-# здесь мы составляем список точек прогнозирования. 
-# одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
+# precalculated vectors and consts ----------------------------------------
 
-model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
+all_h = pull(model_list, h) %>% str_split(",") %>% unlist() %>% as.numeric() %>% unique()
+h_max = all_h %>% max()
 
-model_list_h
+split_variable_names = function(predictors_vector, acronyms = NULL, split_by = "[\\+,]") {
+  if (!is.null(acronyms)) {
+    predictors_vector = unabbreviate_vector(predictors_vector, acronyms)
+  }
+  variable_names = str_split(predictors_vector, split_by) %>% unlist() %>% unique()
+  variable_names = variable_names[variable_names != ""]
+  return(variable_names)
+}
 
-# STOPPED here
+predictors = split_variable_names(model_list$predictors, acronyms = acronyms)
+predicted = split_variable_names(model_list$predicted, acronyms = acronyms)
+
+
 
   
 # augment_dataset ---------------------------------------------------------
@@ -168,20 +170,60 @@ augment_tsibble_4_forecasting = function(original_tsibble,
 
 
 forecasters_tsibble = filter(rus_ts, date >= first_useful_date, date <= forecast_from_date)
+useful_vars = c(predictors, predicted) %>% unique()
+forecasters_tsibble = augment_tsibble_4_forecasting(forecasters_tsibble, h_max = h_max)
+forecasters_tsibble = select(forecasters_tsibble, useful_vars)
 
-
-
-wide_ts = augment_tsibble_4_forecasting(rus_ts, h_max = h_max)
-
+# при наличии рваного края (последнее наблюдение приходится на разные даты у разных переменных)
+# дополним набор данных лишними строками по максимуму
+# а прогнозировать будем только заказанный h для каждой переменной, то есть forecasting_dot будет по заказанным h
   
   
-  
 
 
+# forecasting_dot ---------------------------------------------------------
+
+# здесь мы составляем список точек прогнозирования. 
+# одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
+
+model_list = mutate(model_list, multivariate = str_detect(predicted, "[\\+,]"))
+model_list = mutate(model_list, has_predictors = (predictors != ""))
 
 
+# если multivariate модель поддерживает рваный край, то можно ей добавить опцию rugged в опциях
+# TODO: подумать
+
+model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
+
+model_list_h
+
+# STOPPED here
 
 
+# variable availability ---------------------------------------------------
+
+get_variable_availability = function(x, remove_names = c("date", "access_date")) {
+  variable_availability = tibble(var_name = setdiff(colnames(x), remove_names), first_obs_row = NA, last_obs_row = NA,
+                                 first_obs = as.Date(NA), last_obs = as.Date(NA), complete_obs = NA)
+  for (var_no in 1:nrow(variable_availability)) {
+    var_name = variable_availability$var_name[var_no]
+    omitted_x = na.omit(x[, c("date", var_name)])
+    
+    variable_availability$first_obs_row[var_no] = min(which(!is.na(x[, var_name])))
+    variable_availability$last_obs_row[var_no] = max(which(!is.na(x[, var_name])))
+    
+    
+    variable_availability$first_obs[var_no] = head(omitted_x$date, 1)
+    variable_availability$last_obs[var_no] = tail(omitted_x$date, 1)
+
+    variable_availability$complete_obs[var_no] = nrow(omitted_x)
+  }
+  variable_availability = mutate(variable_availability, between_missings = 1 + last_obs_row - first_obs_row - complete_obs)
+  return(variable_availability)
+}
+
+variable_availability = get_variable_availability(forecasters_tsibble)
+variable_availability
 
 
 
