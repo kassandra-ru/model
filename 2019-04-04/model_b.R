@@ -75,19 +75,22 @@ export(rus_ts, file = paste0(data_snapshot_folder, "rus_monthly.csv"))
 
 # create model table ------------------------------------------------------
 
-model_list = tribble(~model, ~equation, ~options, ~h,
-                     "arima", "cpi", "", "1,2,3,4,5,6",
-                     "ets", "ind_prod", "", "1,2,3,4,5,6",
-                     "arima", "cpi", "order=c(1,0,1),seasonal=c(1,1,1),method='ML'", "1,2,3,4,5,6",
-                     "var", "cpi+ind_prod", "p=5", "1,2,3,4,5,6",
-                     "arima", "cpi~lag2_ind_prod", "order=c(1,0,1),seasonal=c(1,1,1)", "1,2",
-                     "ranger", "cpi~lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
-                     "tbats", "cpi", "", "1,2,3,4,5,6")
+model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
+                     "arima", "cpi", "", "", "1,2,3,4,5,6",
+                     "ets", "ind_prod", "", "", "1,2,3,4,5,6",
+                     "arima", "cpi", "", "order=c(1,0,1),seasonal=c(1,1,1),method='ML'", "1,2,3,4,5,6",
+                     "var", "cpi+ind_prod", "", "p=5", "1,2,3,4,5,6",
+                     "arima", "cpi", "lag2_ind_prod", "order=c(1,0,1),seasonal=c(1,1,1)", "1,2",
+                     "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
+                     "tbats", "cpi", "", "", "1,2,3,4,5,6")
 model_list
 
 # здесь можно дописать конструктор model_list который по h подбирает лаги
 # типа lah0 = lag1 при h=1 и lag2 при h=2
 # TODO: подумать, а надо ли оно
+
+# если будут предикторы высокочастотные — разделять их в предикторах через | или типа того!
+
 
 # acronyms act on equation(+) and options(?)
 acronyms = tribble(~acronym, ~meaning,
@@ -100,7 +103,7 @@ forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment 
 proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
 
 window_type = "sliding" # "sliding" or "stretching" as called in tsibble
-
+h_max = pull(model_list, h) %>% str_split(",") %>% unlist() %>% as.numeric() %>% max()
 
 # forecasting_dot ---------------------------------------------------------
 
@@ -109,6 +112,7 @@ window_type = "sliding" # "sliding" or "stretching" as called in tsibble
 
 model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
 
+model_list_h
 
 # STOPPED here
 
@@ -117,7 +121,9 @@ model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
 
 # add h_max new lines at the end
 # add a lot of lags for each variable, trend, fourier cos/sin
-augment_tsibble_4_forecasting = function(original_tsibble, lags = 0:(2*frequency(original_tsibble)), h_max = 1) {
+augment_tsibble_4_forecasting = function(original_tsibble, 
+                                         lags = 0:(2*frequency(original_tsibble)), 
+                                         h_max = 1) {
   
   message("Augmenting data set")
   augmented_tsibble = tsibble::append_row(original_tsibble, n = h_max)
@@ -134,9 +140,11 @@ augment_tsibble_4_forecasting = function(original_tsibble, lags = 0:(2*frequency
 }
 
 
+forecasters_tsibble = filter(rus_ts, date >= first_useful_date, date <= forecast_from_date)
 
 
-wide_ts = augment_tsibble_4_forecasting(rus_ts)
+
+wide_ts = augment_tsibble_4_forecasting(rus_ts, h_max = h_max)
 
   
   
