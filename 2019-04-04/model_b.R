@@ -37,6 +37,20 @@ daily_to_monthly = function(daily_tsibble) {
   return(monthly_tsibble)
 }
 
+# file_name - vector of file names
+# read all csv files and join them in a huge tsibble :)
+join_ts_files = function(file_name) {
+  all_data = tibble(file_name = file_name)
+  all_data = mutate(all_data, data = map(file, ~ rio::import(.)))
+  all_data = mutate(all_data, data = map(data, ~ dplyr::select(.x, -access_date)))
+  
+  all_frame = all_data$data %>% reduce(full_join, by = "date") %>% arrange(date) %>% mutate(date = yearmonth(ymd(date)))
+  
+  all_tsibble = as_tsibble(all_frame, index = date)
+  return(all_tsibble)
+}
+
+
 # aggregate exchange rate: from dayly to monthly ----------------------------------------------------
 
 exch_rate_daily = import(paste0(raw_data_folder, "exchangerate.csv"))
@@ -44,21 +58,172 @@ exch_rate = daily_to_monthly(exch_rate_daily)
 exch_rate
 export(exch_rate, file = paste0(data_snapshot_folder, "exchangerate_m.csv"))
 
-# load all monthly
 
-rus_m = tibble(file = c(paste0(raw_data_folder, c("1-03.csv", "1-08.csv", "1-11.csv",
-                        "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv",
-                        "reserves.csv", "trade.csv", "urov_12kv.csv")), paste0(data_snapshot_folder, "exchangerate_m.csv")))
-rus_m = mutate(rus_m, data = map(file, ~ rio::import(.)))
-rus_m = mutate(rus_m, data = map(data, ~ dplyr::select(.x, -access_date)))
 
-rus_all = rus_m$data %>% reduce(full_join, by = "date") %>% arrange(date) %>% mutate(date = yearmonth(ymd(date)))
+# join all small files into big table -------------------------------------
 
-rus_ts = rus_all %>% as_tsibble(index = date)
+
+file = c(paste0(raw_data_folder, c("1-03.csv", "1-08.csv", "1-11.csv",
+                                   "i_ipc.csv", "ind_okved2.csv", "lendrate.csv", "m2-m2_sa.csv",
+                                   "reserves.csv", "trade.csv", "urov_12kv.csv")), 
+         paste0(data_snapshot_folder, "exchangerate_m.csv"))
+file
+rus_ts = join_ts_files(file)
 export(rus_ts, file = paste0(data_snapshot_folder, "rus_monthly.csv"))
 
 
 
+# create model table ------------------------------------------------------
+
+model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
+                     "arima", "cpi", "", "", "1,2,3,4,5,6",
+                     "ets", "ind_prod", "", "", "1,2,3,4,5,6",
+                     "arima", "cpi", "", "order=c(1,0,1),seasonal=c(1,1,1),method='ML'", "1,2,3,4,5,6",
+                     "var", "cpi+ind_prod", "", "p=5", "1,2,3,4,5,6",
+                     "arima", "cpi", "lag2_ind_prod", "order=c(1,0,1),seasonal=c(1,1,1)", "1,2",
+                     "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
+                     "tbats", "cpi", "", "", "1,2,3,4,5,6")
+model_list
+
+# здесь можно дописать конструктор model_list который по h подбирает лаги
+# типа lah0 = lag1 при h=1 и lag2 при h=2
+# TODO: подумать, а надо ли оно
+
+# если будут предикторы высокочастотные — разделять их в предикторах через | или типа того!
+
+
+# acronyms act on equation(+) and options(?)
+acronyms = tribble(~acronym, ~meaning,
+                   "FOURIER_M", "s1_12+s2_12+s3_12+s4_12+s5_12+c1_12+c2_12+c3_12+c4_12+c5_12+c6_12",
+                   "FOURIER_Q", "s1_4+c1_4+c2_4",
+                   "TRENDS", "trend_lin+trend_root")
+acronyms
+
+first_useful_date = ymd("2011-10-01") # all previous info will be ignored
+forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment of time
+proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
+
+window_type = "sliding" # "sliding" or "stretching" as called in tsibble
+
+
+
+# unabbreviate functions ---------------------------------------------------------
+
+
+unabbreviate_vector = function(original_vector, acronyms) {
+  full_vector = original_vector
+  for (acro_no in 1:nrow(acronyms)) {
+    full_vector = stringr::str_replace_all(full_vector, acronyms$acronym[acro_no], acronyms$meaning[acro_no])
+  }
+  return(full_vector)
+}
+
+unabbreviate_tibble = function(original_tibble, acronyms, columns) {
+  full_tibble = mutate_at(original_tibble, .vars = columns, ~unabbreviate_vector(., acronyms))
+  return(full_tibble)
+}
+
+unabbreviate_tibble(model_list, acronyms, columns = "predictors")
+
+
+# precalculated vectors and consts ----------------------------------------
+
+all_h = pull(model_list, h) %>% str_split(",") %>% unlist() %>% as.numeric() %>% unique()
+h_max = all_h %>% max()
+
+split_variable_names = function(predictors_vector, acronyms = NULL, split_by = "[\\+,]") {
+  if (!is.null(acronyms)) {
+    predictors_vector = unabbreviate_vector(predictors_vector, acronyms)
+  }
+  variable_names = str_split(predictors_vector, split_by) %>% unlist() %>% unique()
+  variable_names = variable_names[variable_names != ""]
+  return(variable_names)
+}
+
+predictors = split_variable_names(model_list$predictors, acronyms = acronyms)
+predicted = split_variable_names(model_list$predicted, acronyms = acronyms)
+
+
+
+  
+# augment_dataset ---------------------------------------------------------
+
+# add h_max new lines at the end
+# add a lot of lags for each variable, trend, fourier cos/sin
+augment_tsibble_4_forecasting = function(original_tsibble, 
+                                         lags = 0:(2*frequency(original_tsibble)), 
+                                         h_max = 1) {
+  
+  message("Augmenting data set")
+  augmented_tsibble = tsibble::append_row(original_tsibble, n = h_max)
+  
+  message("Add lags ", lags, " for each variable")
+  
+  var_names = setdiff(colnames(original_tsibble), c("date", "access_date"))
+  augmented_tsibble = add_lags(augmented_tsibble, var_names, lags = lags)
+  
+  message("Adding trend and periodic coefficients")
+  augmented_tsibble = add_fourier(augmented_tsibble) %>% add_trend()
+  
+  return(augmented_tsibble)
+}
+
+
+forecasters_tsibble = filter(rus_ts, date >= first_useful_date, date <= forecast_from_date)
+useful_vars = c(predictors, predicted) %>% unique()
+forecasters_tsibble = augment_tsibble_4_forecasting(forecasters_tsibble, h_max = h_max)
+forecasters_tsibble = select(forecasters_tsibble, useful_vars)
+
+# при наличии рваного края (последнее наблюдение приходится на разные даты у разных переменных)
+# дополним набор данных лишними строками по максимуму
+# а прогнозировать будем только заказанный h для каждой переменной, то есть forecasting_dot будет по заказанным h
+  
+  
+
+
+# forecasting_dot ---------------------------------------------------------
+
+# здесь мы составляем список точек прогнозирования. 
+# одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
+
+model_list = mutate(model_list, multivariate = str_detect(predicted, "[\\+,]"))
+model_list = mutate(model_list, has_predictors = (predictors != ""))
+
+
+# если multivariate модель поддерживает рваный край, то можно ей добавить опцию rugged в опциях
+# TODO: подумать
+
+model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
+
+model_list_h
+
+# STOPPED here
+
+
+# variable availability ---------------------------------------------------
+
+get_variable_availability = function(x, remove_names = c("date", "access_date")) {
+  variable_availability = tibble(var_name = setdiff(colnames(x), remove_names), first_obs_row = NA, last_obs_row = NA,
+                                 first_obs = as.Date(NA), last_obs = as.Date(NA), complete_obs = NA)
+  for (var_no in 1:nrow(variable_availability)) {
+    var_name = variable_availability$var_name[var_no]
+    omitted_x = na.omit(x[, c("date", var_name)])
+    
+    variable_availability$first_obs_row[var_no] = min(which(!is.na(x[, var_name])))
+    variable_availability$last_obs_row[var_no] = max(which(!is.na(x[, var_name])))
+    
+    
+    variable_availability$first_obs[var_no] = head(omitted_x$date, 1)
+    variable_availability$last_obs[var_no] = tail(omitted_x$date, 1)
+
+    variable_availability$complete_obs[var_no] = nrow(omitted_x)
+  }
+  variable_availability = mutate(variable_availability, between_missings = 1 + last_obs_row - first_obs_row - complete_obs)
+  return(variable_availability)
+}
+
+variable_availability = get_variable_availability(forecasters_tsibble)
+variable_availability
 
 
 
