@@ -101,7 +101,7 @@ acronyms
 
 first_useful_date = ymd("2011-10-01") # all previous info will be ignored
 forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment of time
-proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
+proportion_cv = 0.2 # доля ряда, используемая для оценки качества прогнозов с помощью кросс-валидации
 
 window_type = "sliding" # "sliding" or "stretching" as called in tsibble
 
@@ -118,12 +118,8 @@ unabbreviate_vector = function(original_vector, acronyms) {
   return(full_vector)
 }
 
-unabbreviate_tibble = function(original_tibble, acronyms, columns) {
-  full_tibble = mutate_at(original_tibble, .vars = columns, ~unabbreviate_vector(., acronyms))
-  return(full_tibble)
-}
+model_list = mutate(model_list, predictors_full = unabbreviate_vector(predictors, acronyms))
 
-unabbreviate_tibble(model_list, acronyms, columns = "predictors")
 
 
 # precalculated vectors and consts ----------------------------------------
@@ -142,7 +138,6 @@ split_variable_names = function(predictors_vector, acronyms = NULL, split_by = "
 
 predictors = split_variable_names(model_list$predictors, acronyms = acronyms)
 predicted = split_variable_names(model_list$predicted, acronyms = acronyms)
-
 
 
   
@@ -174,30 +169,12 @@ useful_vars = c(predictors, predicted) %>% unique()
 forecasters_tsibble = augment_tsibble_4_forecasting(forecasters_tsibble, h_max = h_max)
 forecasters_tsibble = select(forecasters_tsibble, useful_vars)
 
+frequency = frequency(forecasters_tsibble)
 # при наличии рваного края (последнее наблюдение приходится на разные даты у разных переменных)
 # дополним набор данных лишними строками по максимуму
 # а прогнозировать будем только заказанный h для каждой переменной, то есть forecasting_dot будет по заказанным h
   
   
-
-
-# forecasting_dot ---------------------------------------------------------
-
-# здесь мы составляем список точек прогнозирования. 
-# одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
-
-model_list = mutate(model_list, multivariate = str_detect(predicted, "[\\+,]"))
-model_list = mutate(model_list, has_predictors = (predictors != ""))
-
-
-# если multivariate модель поддерживает рваный край, то можно ей добавить опцию rugged в опциях
-# TODO: подумать
-
-model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
-
-model_list_h
-
-# STOPPED here
 
 
 # variable availability ---------------------------------------------------
@@ -225,6 +202,99 @@ get_variable_availability = function(x, remove_names = c("date", "access_date"))
 variable_availability = get_variable_availability(forecasters_tsibble)
 variable_availability
 
+
+# model dates ---------------------------------------------------------
+
+# здесь мы составляем список точек прогнозирования. 
+# одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
+
+model_list = mutate(model_list, multivariate = str_detect(predicted, "[\\+,]"))
+model_list = mutate(model_list, has_predictors = (predictors != ""))
+
+
+# если multivariate модель поддерживает рваный край, то можно ей добавить опцию rugged в опциях
+# TODO: подумать
+
+model_list_h = mutate(model_list, h = as.list(str_split(h, ","))) %>% unnest()
+
+model_list_h
+
+# STOPPED here
+
+calculate_model_dates = function(model_list, variable_availability, frequency, proportion_cv = 0.2) {
+  model_list = mutate(model_list, frequency = frequency, 
+                time_unit = case_when(frequency == 12 ~ months(1),
+                                      frequency == 4 ~ months(3)))
+  
+  model_list = mutate(model_list, vars_first_date = as.Date(NA), vars_last_date = as.Date(NA), 
+                      vars_first_row = NA, vars_last_row = NA)
+  for (model_no in 1:nrow(model_list)) {
+    predictors = split_variable_names(model_list$predictors_full[model_no])
+    predicted = split_variable_names(model_list$predicted[model_no])
+    all_used_vars = c(predictors, predicted) %>% unique()
+    variable_info = filter(variable_availability, var_name %in% all_used_vars)
+    model_list$vars_first_date[model_no] = max(variable_info$first_obs) 
+    model_list$vars_last_date[model_no] = min(variable_info$last_obs) 
+    model_list$vars_first_row[model_no] = max(variable_info$first_obs_row) 
+    model_list$vars_last_row[model_no] = min(variable_info$last_obs_row) 
+    
+    all_h = model_list$h[model_no] %>% str_split("[\\+,]") %>% unlist() %>% as.numeric()
+    h_max = max(all_h)
+    
+  }
+  model_list = mutate(model_list, useful_rows = vars_last_row - vars_first_row + 1,
+                      cv_rows = round(proportion_cv * useful_rows),
+                      initial_window_length = useful_rows - cv_rows,
+                      future_first_date = vars_last_date + time_unit,
+                      future_last_date = vars_last_date + h_max * time_unit,
+                      cv_first_date = case_when(proportion_cv > 0 ~ vars_last_date - (cv_rows - 1) * time_unit,
+                                                  TRUE ~ as.Date(NA)),
+                      cv_last_date = case_when(proportion_cv > 0 ~ vars_last_date,
+                                                 TRUE ~ as.Date(NA)),
+                      initial_window_first_date = vars_first_date,
+                      initial_window_last_date = initial_window_first_date + (initial_window_length - 1) * time_unit)
+  return(model_list)
+}
+
+model_list_dated = calculate_model_dates(model_list, variable_availability, frequency = 12, proportion_cv = 0.2)
+
+
+# calculate forecasting dots ----------------------------------------------
+
+
+
+create_forecasting_dots = function(model_list_dated) {
+  model_list_dated = mutate(model_list_dated, h_list = as.list(str_split(h, ",")))
+  model_list_dated = unnest(model_list_dated) %>% mutate(h_list = as.numeric(h_list))
+  model_list_dated = mutate(model_list_dated, predicted_list = as.list(str_split(predicted, "[\\+,]")))
+  model_list_dated = unnest(model_list_dated)
+  
+  model_list_dated = mutate(model_list_dated, 
+                            future_dot_date = future_first_date + (h_list - 1) * time_unit)
+
+  forecasting_dots = model_list_dated
+
+  return(forecasting_dots)
+}
+
+  
+forecasting_dots = create_forecasting_dots(model_list_dated)
+
+
+# fill dots ---------------------------------------------------------------
+
+
+
+# forecasting_dots = fill_dots_univariate(forecasting_dots)
+# forecasting_dots = fill_dots_univariate_regressors(forecasting_dots)
+
+# forecasting_dots = fill_dots_multivariate(forecasting_dots)
+# forecasting_dots = fill_dots_multivariate_regressors(forecasting_dots)
+
+
+
+
+# OLD JUNK below!
 
 
 # cpi univariate models -------------------------------------------------------
