@@ -27,6 +27,14 @@ raw_data_folder = "../../data/raw/2019-05-15/"
 data_snapshot_folder = "data_snapshot/"
 dir.create(data_snapshot_folder)
 
+fit_folder = "fit/"
+dir.create(fit_folder)
+
+fcst_folder = "fcst/"
+dir.create(fcst_folder)
+
+
+
 
 # daily tsibble should contain date, access_date and more columns!
 # the last (!) value for each month will be used (!)
@@ -85,12 +93,16 @@ model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
 model_list
 
-general_model_info = tribble(~model, ~h_dependent, ~multivariate, ~allows_regressors,
+general_model_info = tribble(~model, ~h_dependent, ~multivariate, ~allows_regressors, 
                              "arima", FALSE, FALSE, TRUE,
                              "ets", FALSE, FALSE, FALSE,
                              "ranger", TRUE, FALSE, TRUE,
                              "var", FALSE, TRUE, TRUE,
                              "tbats", FALSE, FALSE, FALSE)
+
+general_model_info = mutate(general_model_info, estimator = paste0(model, "_estimator"),
+                            forecastor = case_when(model %in% c("arima", "ets", "tbats") ~ "uni_forecastor",
+                                                   TRUE ~ paste0(model, "_forecastor")))
 general_model_info
 
 
@@ -318,9 +330,46 @@ glimpse(forecasting_dots_unnested)
 # fill dots ---------------------------------------------------------------
 
 
-# forecasting_dots = fill_dots(forecasting_dots, "arima", arima_estimator)
-# forecasting_dots = fill_dots(forecasting_dots, "tbats", tbats_estimator)
+# forecasting_dots = fill_fits(forecasting_dots, "arima", arima_estimator)
+# forecasting_dots = fill_fits(forecasting_dots, "tbats", tbats_estimator)
 
+save_to = "memory" # "file" in fit_folder
+
+fill_fits = function(forecasting_dots, model, model_estimator, save_to = c("memory", "file"), full_data) {
+  save_to = match.arg(save_to)
+  
+  
+}
+
+get_train_sample(full_dataset, train_first_date, train_last_date) {
+  return(filter(full_dataset, date >= train_first_date, date <= train_last_date))
+}
+
+estimate_one_fit = function(train_sample, predicted, predictors, options, estimator) {
+  fit = do.call(estimator, 
+                list(train_sample = train_sample, estimator = estimator, 
+                     predicted = predicted, options = options, predictors = predictors))
+  return(fit)
+}
+
+
+save_if_requested = function(fit, fits_folder, fit_file, save_to) {
+  if (save_to == "memory") {
+    return(fit)
+  } else {
+    write_rds(fit, path = paste0(fits_folder, fit_file))
+    return(NA)
+  }
+}
+
+
+# "memory"
+# step 5
+forecasting_dots = mutate(forecasting_dots, point_forecast = forecast_2_scalar(fcst))
+
+# "file"
+# step 5
+forecasting_dots = mutate(forecasting_dots, point_forecast = forecast_2_scalar(read_rds(paste0(fcst_folder, fcst_file))))
 
 
 
