@@ -267,7 +267,7 @@ glimpse(model_list_h_predicted)
 
 # функция создаёт табличку обучающих выборок и точек прогнозирования
 forecasting_goal_2_dots = function(frequency, h_list, time_unit, future_first_date, cv_first_date, cv_last_date, 
-                                   initial_window_first_date, window_type, initial_window_length) {
+                                   initial_window_first_date, window_type, initial_window_length, cv_rows) {
   time_string = case_when(frequency == 12 ~ "1 months",
                           frequency == 4 ~ "3 months")
   new_date = future_first_date  + (h_list - 1) * time_unit
@@ -284,24 +284,18 @@ forecasting_goal_2_dots = function(frequency, h_list, time_unit, future_first_da
   return(forecasting_dots)
 }
 
+
+
+
+forecasting_dots = mutate(model_list_h_predicted, 
+                          dots = pmap(list(frequency = frequency, h_list = h_list, time_unit = time_unit, 
+                                      future_first_date = future_first_date, cv_first_date = cv_first_date, cv_last_date = cv_last_date, 
+                                      initial_window_first_date = initial_window_first_date, 
+                                      window_type = window_type, initial_window_length = initial_window_length,
+                                      cv_rows = cv_rows), 
+                                      forecasting_goal_2_dots))
+
 # STOPPED here
-
-
-forecasting_dots = mutate(model_list_dated, 
-                          dots = pmap(., forecasting_goal_2_dots))
-
-pmap_dfr(model_list_h_predicted, forecasting_goal_2_dots)
-
-test_f = function(speed, dist) {
-  return(tibble(a = 1:(speed * dist)))
-}
-
-cars2 = as.tibble(cars)
-mutate(cars2, res = pmap_df(list(speed, dist), test_f))
-pmap_df(cars, test_f)
-  
-forecasting_dots = create_forecasting_dots(model_list_dated)
-
 
 # fill dots ---------------------------------------------------------------
 
