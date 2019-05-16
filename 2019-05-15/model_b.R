@@ -85,6 +85,15 @@ model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
 model_list
 
+general_model_info = tribble(~model, ~h_dependent, ~multivariate, ~allows_regressors,
+                             "arima", FALSE, FALSE, TRUE,
+                             "ets", FALSE, FALSE, FALSE,
+                             "ranger", TRUE, FALSE, TRUE,
+                             "var", FALSE, TRUE, TRUE,
+                             "tbats", FALSE, FALSE, FALSE)
+general_model_info
+
+
 # здесь можно дописать конструктор model_list который по h подбирает лаги
 # типа lah0 = lag1 при h=1 и lag2 при h=2
 # TODO: подумать, а надо ли оно
@@ -294,18 +303,23 @@ forecasting_dots = mutate(model_list_h_predicted,
                                       window_type = window_type, initial_window_length = initial_window_length,
                                       cv_rows = cv_rows), 
                                       forecasting_goal_2_dots))
+forecasting_dots_unnested = unnest(forecasting_dots)
+
+
+forecasting_dots_unnested = mutate(forecasting_dots_unnested, 
+      model_id = group_indices(forecasting_dots_unnested, model, predicted, predictors, options),
+      fit_id = group_indices(forecasting_dots_unnested, model, predicted, predictors, options, train_first_date, train_last_date))
+
+glimpse(forecasting_dots_unnested)
+?group_indices
 
 # STOPPED here
 
 # fill dots ---------------------------------------------------------------
 
 
-
-# forecasting_dots = fill_dots_univariate(forecasting_dots)
-# forecasting_dots = fill_dots_univariate_regressors(forecasting_dots)
-
-# forecasting_dots = fill_dots_multivariate(forecasting_dots)
-# forecasting_dots = fill_dots_multivariate_regressors(forecasting_dots)
+# forecasting_dots = fill_dots(forecasting_dots, "arima", arima_estimator)
+# forecasting_dots = fill_dots(forecasting_dots, "tbats", tbats_estimator)
 
 
 

@@ -1,3 +1,12 @@
+# devtools::install_github("kassandra-ru/kassandr")
+library(kassandr)
+
+library(tidyverse)
+library(rio)
+library(lubridate)
+library(docxtractr)
+
+
 info = Sys.info() # получаем информацию о системе
 
 if (info[1] == "Linux") {
@@ -12,15 +21,6 @@ if (info[1] == "Windows") {
 
 path = "~/Documents/kassandra/data/raw/"
 path = "D:/Research/Kassandra/data/raw/"
-
-
-# devtools::install_github("kassandra-ru/kassandr")
-library(kassandr)
-
-library(tidyverse)
-library(rio)
-library(lubridate)
-library(docxtractr)
 
 
 path_day = paste0(path, "/", Sys.Date(), "/") # add current date to path
