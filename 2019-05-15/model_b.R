@@ -264,34 +264,41 @@ model_list_h_predicted = melt_h_predicted(model_list_dated)
 glimpse(model_list_h_predicted)
 
 
-# STOPPED here
 
-# функция преобразует одну строку из model_list_h_predicted в табличку обучающих выборок и прогнозов
-forecasting_goal_2_dots = function(one_row) {
-  n_dots = one_row$cv_rows + 1 # кросс-валидация + одна точка в будущем
-  time_string = case_when(one_row$frequency == 12 ~ "1 months",
-                          one_row$frequency == 4 ~ "3 months")
-  new_date = one_row$future_first_date  + (one_row$h_list - 1) * one_row$time_unit
-  forecasting_dots = tibble(dot_date = c(seq(from = one_row$cv_first_date, to = one_row$cv_last_date, by = time_string), new_date))
+# функция создаёт табличку обучающих выборок и точек прогнозирования
+forecasting_goal_2_dots = function(frequency, h_list, time_unit, future_first_date, cv_first_date, cv_last_date, 
+                                   initial_window_first_date, window_type, initial_window_length) {
+  time_string = case_when(frequency == 12 ~ "1 months",
+                          frequency == 4 ~ "3 months")
+  new_date = future_first_date  + (h_list - 1) * time_unit
+  forecasting_dots = tibble(dot_date = c(seq(from = cv_first_date, to = cv_last_date, by = time_string), new_date))
     
   
-  forecasting_dots = mutate(forecasting_dots, h = one_row$h_list, in_cv = c(rep(TRUE, one_row$cv_rows), FALSE))
-  forecasting_dots = mutate(forecasting_dots, train_last_date = dot_date - h * one_row$time_unit)
-  if (one_row$window_type == "stretching") {
-    forecasting_dots = mutate(forecasting_dots, train_first_date = one_row$initial_window_first_date)
-  } else if (one_row$window_type == "sliding") {
-    forecasting_dots = mutate(forecasting_dots, train_first_date = train_last_date - (one_row$initial_window_length - 1) * one_row$time_unit)
+  forecasting_dots = mutate(forecasting_dots, h = h_list, in_cv = c(rep(TRUE, cv_rows), FALSE))
+  forecasting_dots = mutate(forecasting_dots, train_last_date = dot_date - h * time_unit)
+  if (window_type == "stretching") {
+    forecasting_dots = mutate(forecasting_dots, train_first_date = initial_window_first_date)
+  } else if (window_type == "sliding") {
+    forecasting_dots = mutate(forecasting_dots, train_first_date = train_last_date - (initial_window_length - 1) * time_unit)
   }
   return(forecasting_dots)
 }
 
-one_row = model_list_h_predicted[1, ]
-forecasting_dots = forecasting_goal_2_dots(one_row)
-forecasting_dots
+# STOPPED here
 
 
+forecasting_dots = mutate(model_list_dated, 
+                          dots = pmap(., forecasting_goal_2_dots))
 
+pmap_dfr(model_list_h_predicted, forecasting_goal_2_dots)
 
+test_f = function(speed, dist) {
+  return(tibble(a = 1:(speed * dist)))
+}
+
+cars2 = as.tibble(cars)
+mutate(cars2, res = pmap_df(list(speed, dist), test_f))
+pmap_df(cars, test_f)
   
 forecasting_dots = create_forecasting_dots(model_list_dated)
 
