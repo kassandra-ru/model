@@ -86,9 +86,9 @@ export(rus_ts, file = paste0(data_snapshot_folder, "rus_monthly.csv"))
 model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
                      "arima", "cpi", "", "", "1,2,3,4,5,6",
                      "ets", "ind_prod", "", "", "1,2,3,4,5,6",
-                     "arima", "cpi", "", "order=c(1,0,1),seasonal=c(1,1,1),method='ML'", "1,2,3,4,5,6",
+                     "arima", "cpi", "", "p=1,d=1,q=1,pseas=1,dseas=1,qseas=1,method='ML'", "1,2,3,4,5,6",
                      "var", "cpi+ind_prod", "", "p=5", "1,2,3,4,5,6",
-                     "arima", "cpi", "lag2_ind_prod", "order=c(1,0,1),seasonal=c(1,1,1)", "1,2",
+                     "arima", "cpi", "lag2_ind_prod", "p=1,d=0,q=1,pseas=1,dseas=1,qseas=1", "1,2",
                      "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
 model_list
@@ -105,9 +105,7 @@ model_2_estimator = function(model_name) {
 }
 
 model_2_forecastor = function(model_name) {
-  forecastor = case_when(model_name %in% c("arima", "ets", "tbats") ~ "uni_forecastor",
-                         TRUE ~ paste0(model_name, "_forecastor"))
-  return(forecastor)
+  return(paste0(model_name, "_forecastor"))
 }
 
 
@@ -226,12 +224,52 @@ variable_availability
 
 # model dates ---------------------------------------------------------
 
+
+# convert to numeric if possible :)
+gentle_as_numeric = function(chr_vector) {
+  num_vector = as.numeric(chr_vector)
+  res_list = as.list(chr_vector)
+  res_list[!is.na(num_vector)] = num_vector[!is.na(num_vector)]
+  return(res_list)
+}
+# gentle_as_numeric(c("5", "ggg", "'sss'"))
+
+# test = c("aaa", "'bbb'")
+remove_quotes = function(chr_vector) {
+  quoted = str_starts(chr_vector, "[']") & str_ends(chr_vector, "[']")
+  chr_vector[quoted] = str_sub(chr_vector[quoted], start = 2, end = -2)
+  return(chr_vector)
+}
+# remove_quotes(test)
+
+# param_string = "q=3, p=4, v='ml', qur=mlp"
+param_string_2_tibble = function(param_string) {
+  if (param_string == "") {
+    params = as_tibble(list())
+  } else {
+    splitted = str_split(param_string, ",") %>% unlist() %>% str_trim()
+    lhs_rhs = str_split(splitted, "=") %>% unlist()
+    n_pars = length(lhs_rhs) / 2
+    rhs = remove_quotes(lhs_rhs[2 * (1:n_pars)])
+    lhs = lhs_rhs[2 * (1:n_pars) - 1]
+    params = as.list(rhs)
+    params = gentle_as_numeric(params)
+    names(params) = lhs
+    params = as_tibble(params)
+  }
+  return(params)
+}
+# params = param_string_2_tibble(param_string)
+
+
+
+
 # здесь мы составляем список точек прогнозирования. 
 # одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
 
 model_list = mutate(model_list, multivariate = str_detect(predicted, "[\\+,]"))
 model_list = mutate(model_list, has_predictors = (predictors != ""))
-
+model_list = mutate(model_list, options_tibble = map(options, ~ param_string_2_tibble(.x)))
 
 # если multivariate модель поддерживает рваный край, то можно ей добавить опцию rugged в опциях
 # TODO: подумать
@@ -296,13 +334,14 @@ model_list_dated = mutate(model_list_dated, window_type = "sliding") # add slidi
 
 
 melt_h_predicted = function(model_list_dated) {
-  model_list_dated = mutate(model_list_dated, h_list = as.list(str_split(h, ",")))
-  model_list_dated = unnest(model_list_dated) %>% mutate(h_list = as.numeric(h_list))
-  model_list_dated = mutate(model_list_dated, predicted_list = as.list(str_split(predicted, "[\\+,]")))
-  model_list_dated = unnest(model_list_dated)
-  return(model_list_dated)  
+  model_list_upd = mutate(model_list_dated, h_list = as.list(str_split(h, ",")))
+  model_list_upd = unnest(model_list_upd, h_list, .drop = FALSE) %>% mutate(h_list = as.numeric(h_list))
+  model_list_upd = mutate(model_list_upd, predicted_list = as.list(str_split(predicted, "[\\+,]")))
+  model_list_upd = unnest(model_list_upd, predicted_list, .drop = FALSE)
+  return(model_list_upd)  
 }
 
+glimpse(model_list_dated)
 model_list_h_predicted = melt_h_predicted(model_list_dated)
 glimpse(model_list_h_predicted)
 
@@ -337,7 +376,7 @@ forecasting_dots = mutate(model_list_h_predicted,
                                       window_type = window_type, initial_window_length = initial_window_length,
                                       cv_rows = cv_rows), 
                                       forecasting_goal_2_dots))
-forecasting_dots_unnested = unnest(forecasting_dots)
+forecasting_dots_unnested = unnest(forecasting_dots, dots)
 
 
 forecasting_dots_unnested = mutate(forecasting_dots_unnested, 
@@ -345,7 +384,7 @@ forecasting_dots_unnested = mutate(forecasting_dots_unnested,
       fit_id = group_indices(forecasting_dots_unnested, model, predicted, predictors, options, train_first_date, train_last_date))
 
 glimpse(forecasting_dots_unnested)
-?group_indices
+
 
 # STOPPED here
 
@@ -432,39 +471,6 @@ uni_forecastor = function(fit, h = 1, test_sample = NULL) {
 }
 
 
-# convert to numeric if possible :)
-gentle_as_numeric = function(chr_vector) {
-  num_vector = as.numeric(chr_vector)
-  res_list = as.list(chr_vector)
-  res_list[!is.na(num_vector)] = num_vector[!is.na(num_vector)]
-  return(res_list)
-}
-
-test = c("aaa", "'bbb'")
-remove_quotes = function(chr_vector) {
-  quoted = str_starts(chr_vector, "[']") & str_ends(chr_vector, "[']")
-  chr_vector[quoted] = str_sub(chr_vector[quoted], start = 2, end = -2)
-  return(chr_vector)
-}
-remove_quotes(test)
-
-param_string = "q=3, p=4, v='ml', qur=mlp"
-param_string_2_tibble = function(param_string) {
-  splitted = str_split(param_string, ",") %>% unlist() %>% str_trim()
-  lhs_rhs = str_split(splitted, "=") %>% unlist()
-  n_pars = length(lhs_rhs) / 2
-  rhs = remove_quotes(lhs_rhs[2 * (1:n_pars)])
-  lhs = lhs_rhs[2 * (1:n_pars) - 1]
-  params = as.list(rhs)
-  params = gentle_as_numeric(params)
-  names(params) = lhs
-  params = as_tibble(params)
-  return(params)
-}
-params = param_string_2_tibble(param_string)
-params
-params %>% glimpse()
-params$p
   
 
 
