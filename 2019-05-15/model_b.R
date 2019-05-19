@@ -393,10 +393,10 @@ estimate_one_fit = function(train_sample, predicted, predictors, options, model)
 
 
 
-forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_1d) {
+forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_1d, h = 1) {
   forecastor = model_2_forecastor(model)
   forecast = do.call(forecastor, 
-                list(fit = fit, predicted_1d = predicted_1d,  
+                list(fit = fit, predicted_1d = predicted_1d, h = h, 
                      predicted = predicted, options = options, predictors = predictors))
   return(forecast)
 }
@@ -432,7 +432,40 @@ uni_forecastor = function(fit, h = 1, test_sample = NULL) {
 }
 
 
+# convert to numeric if possible :)
+gentle_as_numeric = function(chr_vector) {
+  num_vector = as.numeric(chr_vector)
+  res_list = as.list(chr_vector)
+  res_list[!is.na(num_vector)] = num_vector[!is.na(num_vector)]
+  return(res_list)
+}
 
+test = c("aaa", "'bbb'")
+remove_quotes = function(chr_vector) {
+  quoted = str_starts(chr_vector, "[']") & str_ends(chr_vector, "[']")
+  chr_vector[quoted] = str_sub(chr_vector[quoted], start = 2, end = -2)
+  return(chr_vector)
+}
+remove_quotes(test)
+
+param_string = "q=3, p=4, v='ml', qur=mlp"
+param_string_2_tibble = function(param_string) {
+  splitted = str_split(param_string, ",") %>% unlist() %>% str_trim()
+  lhs_rhs = str_split(splitted, "=") %>% unlist()
+  n_pars = length(lhs_rhs) / 2
+  rhs = remove_quotes(lhs_rhs[2 * (1:n_pars)])
+  lhs = lhs_rhs[2 * (1:n_pars) - 1]
+  params = as.list(rhs)
+  params = gentle_as_numeric(params)
+  names(params) = lhs
+  params = as_tibble(params)
+  return(params)
+}
+params = param_string_2_tibble(param_string)
+params
+params %>% glimpse()
+params$p
+  
 
 
 
@@ -443,6 +476,30 @@ forecasting_dots = mutate(forecasting_dots, point_forecast = forecast_2_scalar(f
 # "file"
 # step 5
 forecasting_dots = mutate(forecasting_dots, point_forecast = forecast_2_scalar(read_rds(paste0(fcst_folder, fcst_file))))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
