@@ -91,7 +91,77 @@ model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
                      "arima", "cpi", "lag2_ind_prod", "p=1,d=0,q=1,pseas=1,dseas=1,qseas=1", "1,2",
                      "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
+
+model_list = filter(model_list, model %in% c("arima", "ets", "tbats"))
 model_list
+
+arima_estimator = function(train_sample, predicted, options, predictors) {
+  selected_vars = c(predicted, "date")
+  y = dplyr::select(train_sample, selected_vars) %>% as.ts()
+  
+  has_options = FALSE
+  if (options != "") {
+    has_options = TRUE
+    options = param_string_2_tibble(options)
+  }
+
+  if (predictors == "") {
+    regressors = NULL
+  } else {
+    predictors = split_variable_names(predictors)
+    regressors = dplyr::select(train_sample, predictors) %>% as.ts()
+  }
+  
+
+  if ("p" %in% colnames(options)) {
+    has_order = TRUE
+    pdq = c(options$p, options$d, options$q)
+  } else {
+    pdq = c(0, 0, 0)
+  }
+  
+  if ("pseas" %in% colnames(options)) {
+    has_seasonal = TRUE
+    pdq_seas = c(options$pseas, options$dseas, options$qseas)
+  } else {
+    pdq_seas = c(0, 0, 0)
+  }
+  
+  if ("method" %in% colnames(options)) {
+    method = options$method
+  } else {
+    method = "CSS-ML"
+  }
+  
+  
+  if (!has_options) {
+    fit = auto.arima(y, xreg = regressors, method = method)
+  }
+  if (has_options) {
+    fit = Arima(y, order = pdq, seasonal = pdq_seas, method = method, xreg = regressors)
+  }
+  
+  return(fit)
+}
+# arima_estimator(tr_sample, "ind_prod", "p=1,d=0,q=0,pseas=1,dseas=0,qseas=1", "exch_rate + agriculture")
+
+tbats_estimator = function(train_sample, predicted, options, predictors) {
+  options = param_string_2_tibble(options)
+  y = dplyr::select(train_sample, !!predicted) %>% as.ts()
+  fit = tbats(y) 
+  return(fit)
+}
+
+ets_estimator = function(train_sample, predicted, options, predictors) {
+  options = param_string_2_tibble(options)
+  y = dplyr::select(train_sample, !!predicted) %>% as.ts()
+  fit = ets(y) 
+  return(fit)
+}
+
+
+
+
 
 general_model_info = tribble(~model, ~h_dependent, ~multivariate, ~allows_regressors, 
                              "arima", FALSE, FALSE, TRUE,
@@ -152,11 +222,10 @@ split_variable_names = function(predictors_vector, acronyms = NULL, split_by = "
   }
   variable_names = str_split(predictors_vector, split_by) %>% unlist() %>% unique()
   variable_names = variable_names[variable_names != ""]
+  variable_names = str_trim(variable_names)
   return(variable_names)
 }
 
-predictors = split_variable_names(model_list$predictors, acronyms = acronyms)
-predicted = split_variable_names(model_list$predicted, acronyms = acronyms)
 
 
   
@@ -183,10 +252,15 @@ augment_tsibble_4_forecasting = function(original_tsibble,
 }
 
 
-forecasters_tsibble = filter(rus_ts, date >= first_useful_date, date <= forecast_from_date)
+forecasters_tsibble = filter(rus_ts, date >= first_useful_date)
+
+predictors = split_variable_names(model_list$predictors, acronyms = acronyms)
+predicted = split_variable_names(model_list$predicted, acronyms = acronyms)
 useful_vars = c(predictors, predicted) %>% unique()
-forecasters_tsibble = augment_tsibble_4_forecasting(forecasters_tsibble, h_max = h_max)
+
+forecasters_tsibble = augment_tsibble_4_forecasting(forecasters_tsibble, h_max = h_max)  # точно с запасом :)
 forecasters_tsibble = select(forecasters_tsibble, useful_vars)
+glimpse(forecasters_tsibble)
 
 frequency = frequency(forecasters_tsibble)
 # при наличии рваного края (последнее наблюдение приходится на разные даты у разных переменных)
@@ -394,24 +468,18 @@ glimpse(forecasting_dots_unnested)
 # forecasting_dots = fill_fits(forecasting_dots, "arima", arima_estimator)
 # forecasting_dots = fill_fits(forecasting_dots, "tbats", tbats_estimator)
 
-save_to = "memory" # "file" in fit_folder
-
-fill_fits = function(forecasting_dots, model, model_estimator, save_to = c("memory", "file"), full_data) {
-  save_to = match.arg(save_to)
-  
-  
-}
-
-construct_train_sample(full_data, train_first_date, train_last_date, predicted, predictors) {
-  vars = c(split_variable_names(predictors), split_variable_names(predicted))
+construct_train_sample = function(full_data, train_first_date, train_last_date, predicted, predictors) {
+  vars = c(split_variable_names(predictors), split_variable_names(predicted), "date")
   train_sample = dplyr::select(full_data, vars) %>% filter(date >= train_first_date, date <= train_last_date)
+  # train_sample = augment_tsibble_4_forecasting(train_sample, h_max = 0)
   return(train_sample)
 }
 
 # here h may be either one number 1 or a vector 1, 2, 3
 # the result is different :)
-construct_test_sample = function(full_data, future_first_date, predictors, h, predicted, predictors) {
-  vars = split_variable_names(predictors)
+# НЕВЕРНАЯ ФУНКЦИЯ!!!! регрессоры то надо дописывать от train sample, чтобы например, тренд дальше шёл или цикличные переменные корректно продолжались
+construct_test_sample = function(full_data, future_first_date, h, predicted, predictors) {
+  vars = c(split_variable_names(predictors), "date")
   future_data = dplyr::select(future_data, vars)
   future_data = dplyr::filter(full_data, date >= future_first_date) %>% dplyr::top_n(max(h), date)
   future_data = future_data[h, ]
@@ -430,8 +498,6 @@ estimate_one_fit = function(train_sample, predicted, predictors, options, model)
 
 
 
-
-
 forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_1d, h = 1) {
   forecastor = model_2_forecastor(model)
   forecast = do.call(forecastor, 
@@ -441,9 +507,7 @@ forecast_one_fit = function(fit, predicted, predictors, options, model, predicte
 }
 
 
-
-
-
+# save_to = memory / disk
 save_if_requested = function(fit, fits_folder, fit_file, save_to) {
   if (save_to == "memory") {
     return(fit)
@@ -454,30 +518,30 @@ save_if_requested = function(fit, fits_folder, fit_file, save_to) {
 }
 
 
-#' @title forecasts univariate model fit
-#' @description forecasts univariate model fit
-#' @details forecasts univariate model fit
-#' @param fit univariate model fit
-#' @param h forecasting horizon
-#' @param test_sample future regressors
-#' @return forecast object
-#' @export
-#' @examples
-#' model = forecast::ets(rnorm(100))
-#' uni_forecastor(model, h = 3)
-uni_forecastor = function(fit, h = 1, test_sample = NULL) {
-  fcst = forecast::forecast(fit, h = h, xreg = test_sample)
-  return(fcst)
-}
-
-
-  
-
-
-
 # "memory"
-# step 5
-forecasting_dots = mutate(forecasting_dots, point_forecast = forecast_2_scalar(fcst))
+
+# step 1. create train sample
+forecasting_dots_upd = mutate(forecasting_dots_unnested,
+                          train_sample = pmap(list(train_first_date, train_last_date, predicted, predictors_full), 
+                                              ~ construct_train_sample(full_data = forecasters_tsibble, ..1, ..2, ..3, ..4)))
+
+# step 1.5 estimate model 
+glimpse(forecasting_dots_upd)
+forecasting_dots_upd = mutate(forecasting_dots_upd,
+                              fit = pmap(list(train_sample = train_sample,
+                                              predicted = predicted,
+                                              predictors = predictors_full,
+                                              options = options,
+                                              model = model), estimate_one_fit))
+
+# step 2 construct test sample
+
+# step 2.5 forecast (as object)
+
+
+# step 3. forecast objecto to 
+forecasting_dots = mutate(forecasting_dots, 
+                          point_forecast = pmap(list(fcst_object = fcst, h = h), forecast_2_scalar))
 
 # "file"
 # step 5
@@ -486,305 +550,4 @@ forecasting_dots = mutate(forecasting_dots, point_forecast = forecast_2_scalar(r
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# OLD JUNK below!
-
-
-# cpi univariate models -------------------------------------------------------
-
-start_date = ymd("2011-10-01")
-
-I_ipc = import("../../data/raw/2019-03-10/i_ipc.csv")
-I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)%>%rename(value = cpi)
-rus_m_full_stable = filter(I_ipc_tsibble, date >= start_date)
-
-
-rus_m_full_stable %>% tail()
-rus_m_full_stable %>% head()
-
-
-# cpi quality evaluation --------------------------------------------------
-
-# TODO: rename test to eval
-
-proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
-
-nobs_full = nrow(rus_m_full_stable)
-nobs_test = round(proportion_test * nobs_full)
-
-window_type = "sliding" # "sliding" or "stretching" as in tsibble
-
-
-dates_test = tail(rus_m_full_stable$date, nobs_test)
-
-
-
-h_all = 1:6
-
-
-# model should take: h, model_sample (multivariate tsibble)
-# produce some model :)
-# may ignore h
-
-
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
-                           "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
-#                           "lasso_fun", FALSE, "lasso_2_scalar_forecast",
-#                           "ranger_fun", FALSE, "ranger_2_scalar_forecast")
-
-
-
-
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
-                                window_type = window_type, series_data = rus_m_full_stable)
-cv_results_new = estimate_and_forecast(cv_results)
-
-mae_table = calculate_mae_table(cv_results_new)
-
-mae_table %>% tail()
-write_csv(mae_table, "estimation_results/mae_table_cpi.csv")
-
-
-# real forecasting....
-
-
-
-# models in tibble version ------------------------------------------------
-
-the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable)
-
-the_forecasts_new = estimate_and_forecast(the_forecasts)
-
-only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-write_csv(only_numbers, path = "estimation_results/forecasts_cpi.csv")
-
-
-
-# gdp univariate models -------------------------------------------------------
-
-tab6b = import("../../data/raw/2019-03-10/tab6b.csv")
-tab6b_tsibble = mutate(tab6b, date = yearquarter(date)) %>% as_tsibble(index = date)%>%rename(value = gdp_2016_price)
-tab6b_tsibble = rename(tab6b_tsibble, gdp_real_2016_price = value) %>% mutate(gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
-# из-за того, что берём лаг 4 шага назад первое наблюдение появляется довольно поздно :)
-
-tab6b_tsibble %>% head()
-tab6b_tsibble %>% tail()
-
-start_date = ymd("2012-01-01")
-rus_q_full_stable = tab6b_tsibble %>% rename(value = gdp_rate) %>% filter(date >= start_date)
-
-
-# gdp quality evaluation --------------------------------------------------
-
-# TODO: rename test to eval
-
-proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
-
-nobs_full = nrow(rus_q_full_stable)
-nobs_test = round(proportion_test * nobs_full)
-
-window_type = "sliding" # "sliding" or "stretching" as in tsibble
-
-dates_test = tail(rus_q_full_stable$date, nobs_test)
-
-h_all = 1:3
-
-
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
-                           "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima11_fun", TRUE, "uni_model_2_scalar_forecast")
-
-
-
-# TODO: exact ML in case where ARMA(1,1)-SARMA(1,1) fails
-
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
-                                window_type = window_type, series_data = rus_q_full_stable)
-cv_results_new = estimate_and_forecast(cv_results)
-mae_table = calculate_mae_table(cv_results_new)
-
-mae_table
-write_csv(mae_table, "estimation_results/mae_table_gdp_rate_real.csv")
-
-# real forecasting....
-
-
-# models in tibble version ------------------------------------------------
-
-the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_q_full_stable)
-the_forecasts_new = estimate_and_forecast(the_forecasts)
-
-only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-only_numbers
-write_csv(only_numbers, path = "estimation_results/forecasts_gdp_rate_real.csv")
-
-# industrial product univariate models -------------------------------------------------------
-
-start_date = ymd("2013-01-01")
-
-ind_prod = import("../../data/raw/2019-03-10/ind_okved2.csv")
-ind_prod_tsibble = mutate(ind_prod, date = yearmonth(date)) %>% as_tsibble(index = date)%>%rename(value = ind_prod)
-rus_m_full_stable = filter(ind_prod_tsibble, date >= start_date)
-
-
-rus_m_full_stable %>% tail()
-rus_m_full_stable %>% head()
-
-# industrial product quality evaluation --------------------------------------------------
-
-# TODO: rename test to eval
-
-proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
-
-nobs_full = nrow(rus_m_full_stable)
-nobs_test = round(proportion_test * nobs_full)
-
-window_type = "sliding" # "sliding" or "stretching" as in tsibble
-
-
-dates_test = tail(rus_m_full_stable$date, nobs_test)
-
-
-
-h_all = 1:6
-
-
-# model should take: h, model_sample (multivariate tsibble)
-# produce some model :)
-# may ignore h
-
-
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
-                           "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima111_fun", TRUE, "uni_model_2_scalar_forecast")
-#                           "lasso_fun", FALSE, "lasso_2_scalar_forecast",
-#                           "ranger_fun", FALSE, "ranger_2_scalar_forecast")
-
-
-
-
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
-                                window_type = window_type, series_data = rus_m_full_stable)
-                              
-cv_results_new = estimate_and_forecast(cv_results)
-
-mae_table = calculate_mae_table(cv_results_new)
-
-mae_table %>% tail()
-write_csv(mae_table, "estimation_results/mae_table_ind_prod.csv")
-
-
-# real forecasting....
-
-
-
-# models in tibble version ------------------------------------------------
-
-the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable)
-
-the_forecasts_new = estimate_and_forecast(the_forecasts)
-
-only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-write_csv(only_numbers, path = "estimation_results/forecasts_ind_prod.csv")
-
-
-# investments univariate models -------------------------------------------------------
-
-start_date = ymd("2013-01-01")
-
-ind_prod = import("../../data/raw/2019-03-10/ind_okved2.csv")
-ind_prod_tsibble = mutate(ind_prod, date = yearmonth(date)) %>% as_tsibble(index = date)%>%rename(value = ind_prod)
-rus_m_full_stable = filter(ind_prod_tsibble, date >= start_date)
-
-
-rus_m_full_stable %>% tail()
-rus_m_full_stable %>% head()
-
-# industrial product quality evaluation --------------------------------------------------
-
-# TODO: rename test to eval
-
-proportion_test = 0.2 # доля ряда, используемая для оценки качества прогнозов
-
-nobs_full = nrow(rus_m_full_stable)
-nobs_test = round(proportion_test * nobs_full)
-
-window_type = "sliding" # "sliding" or "stretching" as in tsibble
-
-
-dates_test = tail(rus_m_full_stable$date, nobs_test)
-
-
-
-h_all = 1:6
-
-
-# model should take: h, model_sample (multivariate tsibble)
-# produce some model :)
-# may ignore h
-
-
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
-                           "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima_fun", TRUE, "uni_model_2_scalar_forecast",
-                           "arima111_fun", TRUE, "uni_model_2_scalar_forecast")
-#                           "lasso_fun", FALSE, "lasso_2_scalar_forecast",
-#                           "ranger_fun", FALSE, "ranger_2_scalar_forecast")
-
-
-
-
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
-                                window_type = window_type, series_data = rus_m_full_stable)
-
-cv_results_new = estimate_and_forecast(cv_results)
-
-mae_table = calculate_mae_table(cv_results_new)
-
-mae_table %>% tail()
-write_csv(mae_table, "estimation_results/mae_table_ind_prod.csv")
-
-
-# real forecasting....
-
-
-
-# models in tibble version ------------------------------------------------
-
-the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = rus_m_full_stable)
-
-the_forecasts_new = estimate_and_forecast(the_forecasts)
-
-only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
-write_csv(only_numbers, path = "estimation_results/forecasts_ind_prod.csv")
 
