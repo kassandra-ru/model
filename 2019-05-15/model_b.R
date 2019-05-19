@@ -100,9 +100,20 @@ general_model_info = tribble(~model, ~h_dependent, ~multivariate, ~allows_regres
                              "var", FALSE, TRUE, TRUE,
                              "tbats", FALSE, FALSE, FALSE)
 
-general_model_info = mutate(general_model_info, estimator = paste0(model, "_estimator"),
-                            forecastor = case_when(model %in% c("arima", "ets", "tbats") ~ "uni_forecastor",
-                                                   TRUE ~ paste0(model, "_forecastor")))
+model_2_estimator = function(model_name) {
+  return(paste0(model_name, "_estimator"))
+}
+
+model_2_forecastor = function(model_name) {
+  forecastor = case_when(model_name %in% c("arima", "ets", "tbats") ~ "uni_forecastor",
+                         TRUE ~ paste0(model_name, "_forecastor"))
+  return(forecastor)
+}
+
+
+
+general_model_info = mutate(general_model_info, estimator = model_2_estimator(model),
+                            forecastor = model_2_forecastor(model))
 general_model_info
 
 
@@ -232,22 +243,33 @@ calculate_model_dates = function(model_list, variable_availability, frequency, p
                 time_unit = case_when(frequency == 12 ~ months(1),
                                       frequency == 4 ~ months(3)))
   
-  model_list = mutate(model_list, vars_first_date = as.Date(NA), vars_last_date = as.Date(NA), 
-                      vars_first_row = NA, vars_last_row = NA)
-  for (model_no in 1:nrow(model_list)) {
-    predictors = split_variable_names(model_list$predictors_full[model_no])
-    predicted = split_variable_names(model_list$predicted[model_no])
-    all_used_vars = c(predictors, predicted) %>% unique()
-    variable_info = filter(variable_availability, var_name %in% all_used_vars)
-    model_list$vars_first_date[model_no] = max(variable_info$first_obs) 
-    model_list$vars_last_date[model_no] = min(variable_info$last_obs) 
-    model_list$vars_first_row[model_no] = max(variable_info$first_obs_row) 
-    model_list$vars_last_row[model_no] = min(variable_info$last_obs_row) 
-    
-    all_h = model_list$h[model_no] %>% str_split("[\\+,]") %>% unlist() %>% as.numeric()
-    h_max = max(all_h)
-    
-  }
+  model_list = mutate(model_list, all_used_vars = pmap(list(x = predictors_full, y = predicted),
+                                                       ~ c(split_variable_names(.x), split_variable_names(.y))),
+                                  variable_info = map(all_used_vars, ~ filter(variable_availability, var_name %in% .x)),
+                                  vars_first_date = map(variable_info, ~ max(.x$first_obs)),
+                                  vars_last_date = map(variable_info, ~ min(.x$last_obs)),
+                                  vars_first_row = map_int(variable_info, ~ max(.x$first_obs_row)),
+                                  vars_last_row = map_int(variable_info, ~ min(.x$last_obs_row)),
+                                  h_max = map_int(h, ~ str_split(.x, "[\\+,]") %>% unlist() %>% as.integer() %>% max())) %>% unnest(vars_first_date, vars_last_date)
+  model_list = dplyr::select(model_list, -all_used_vars, -variable_info)
+
+  # model_list = mutate(model_list, vars_first_date = as.Date(NA), vars_last_date = as.Date(NA), 
+  #                     vars_first_row = NA, vars_last_row = NA)
+  # for (model_no in 1:nrow(model_list)) {
+  #   predictors = split_variable_names(model_list$predictors_full[model_no])
+  #   predicted = split_variable_names(model_list$predicted[model_no])
+  #   all_used_vars = c(predictors, predicted) %>% unique()
+  #   variable_info = filter(variable_availability, var_name %in% all_used_vars)
+  #   model_list$vars_first_date[model_no] = max(variable_info$first_obs) 
+  #   model_list$vars_last_date[model_no] = min(variable_info$last_obs) 
+  #   model_list$vars_first_row[model_no] = max(variable_info$first_obs_row) 
+  #   model_list$vars_last_row[model_no] = min(variable_info$last_obs_row) 
+  #   
+  #   all_h = model_list$h[model_no] %>% str_split("[\\+,]") %>% unlist() %>% as.numeric()
+  #   model_list$h_max[model_no] = max(all_h)
+  # }
+  
+  
   model_list = mutate(model_list, useful_rows = vars_last_row - vars_first_row + 1,
                       cv_rows = round(proportion_cv * useful_rows),
                       initial_window_length = useful_rows - cv_rows,
@@ -341,16 +363,46 @@ fill_fits = function(forecasting_dots, model, model_estimator, save_to = c("memo
   
 }
 
-get_train_sample(full_dataset, train_first_date, train_last_date) {
-  return(filter(full_dataset, date >= train_first_date, date <= train_last_date))
+construct_train_sample(full_data, train_first_date, train_last_date, predicted, predictors) {
+  vars = c(split_variable_names(predictors), split_variable_names(predicted))
+  train_sample = dplyr::select(full_data, vars) %>% filter(date >= train_first_date, date <= train_last_date)
+  return(train_sample)
 }
 
-estimate_one_fit = function(train_sample, predicted, predictors, options, estimator) {
+# here h may be either one number 1 or a vector 1, 2, 3
+# the result is different :)
+construct_test_sample = function(full_data, future_first_date, predictors, h, predicted, predictors) {
+  vars = split_variable_names(predictors)
+  future_data = dplyr::select(future_data, vars)
+  future_data = dplyr::filter(full_data, date >= future_first_date) %>% dplyr::top_n(max(h), date)
+  future_data = future_data[h, ]
+  return(future_data)
+}
+
+
+
+estimate_one_fit = function(train_sample, predicted, predictors, options, model) {
+  estimator = model_2_estimator(model)
   fit = do.call(estimator, 
-                list(train_sample = train_sample, estimator = estimator, 
+                list(train_sample = train_sample,  
                      predicted = predicted, options = options, predictors = predictors))
   return(fit)
 }
+
+
+
+
+
+forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_1d) {
+  forecastor = model_2_forecastor(model)
+  forecast = do.call(forecastor, 
+                list(fit = fit, predicted_1d = predicted_1d,  
+                     predicted = predicted, options = options, predictors = predictors))
+  return(forecast)
+}
+
+
+
 
 
 save_if_requested = function(fit, fits_folder, fit_file, save_to) {
@@ -361,6 +413,27 @@ save_if_requested = function(fit, fits_folder, fit_file, save_to) {
     return(NA)
   }
 }
+
+
+#' @title forecasts univariate model fit
+#' @description forecasts univariate model fit
+#' @details forecasts univariate model fit
+#' @param fit univariate model fit
+#' @param h forecasting horizon
+#' @param test_sample future regressors
+#' @return forecast object
+#' @export
+#' @examples
+#' model = forecast::ets(rnorm(100))
+#' uni_forecastor(model, h = 3)
+uni_forecastor = function(fit, h = 1, test_sample = NULL) {
+  fcst = forecast::forecast(fit, h = h, xreg = test_sample)
+  return(fcst)
+}
+
+
+
+
 
 
 # "memory"
