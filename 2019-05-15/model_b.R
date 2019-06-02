@@ -92,19 +92,13 @@ model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
                      "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
 
-model_list = filter(model_list, model %in% c("arima", "ets", "tbats"))
+model_list = filter(model_list, model %in% c("arima"))
 model_list
 
 arima_estimator = function(train_sample, predicted, options, predictors) {
   selected_vars = c(predicted, "date")
   y = dplyr::select(train_sample, selected_vars) %>% as.ts()
   
-  has_options = FALSE
-  if (options != "") {
-    has_options = TRUE
-    options = param_string_2_tibble(options)
-  }
-
   if (predictors == "") {
     regressors = NULL
   } else {
@@ -112,16 +106,17 @@ arima_estimator = function(train_sample, predicted, options, predictors) {
     regressors = dplyr::select(train_sample, predictors) %>% as.ts()
   }
   
-
+  options = param_string_2_tibble(options)
+  
   if ("p" %in% colnames(options)) {
     has_order = TRUE
     pdq = c(options$p, options$d, options$q)
   } else {
+    has_order = FALSE
     pdq = c(0, 0, 0)
   }
   
   if ("pseas" %in% colnames(options)) {
-    has_seasonal = TRUE
     pdq_seas = c(options$pseas, options$dseas, options$qseas)
   } else {
     pdq_seas = c(0, 0, 0)
@@ -134,16 +129,47 @@ arima_estimator = function(train_sample, predicted, options, predictors) {
   }
   
   
-  if (!has_options) {
-    fit = auto.arima(y, xreg = regressors, method = method)
+  if (!has_order) {
+    if (is.null(regressors)) {
+      fit = try(auto.arima(y = y, method = method))
+    } else {
+      fit = try(auto.arima(y = y, xreg = regressors, method = method))
+    }
   }
-  if (has_options) {
-    fit = Arima(y, order = pdq, seasonal = pdq_seas, method = method, xreg = regressors)
+  if (has_order) {
+    if (is.null(regressors)) {
+      fit = try(Arima(y = y, order = pdq, seasonal = pdq_seas, method = method))
+    } else {
+      fit = try(Arima(y = y, order = pdq, seasonal = pdq_seas, method = method, xreg = regressors))
+    }
   }
   
   return(fit)
 }
 # arima_estimator(tr_sample, "ind_prod", "p=1,d=0,q=0,pseas=1,dseas=0,qseas=1", "exch_rate + agriculture")
+
+arima_forecastor = function(fit, test_sample, predicted, predicted_1d, options, predictors, h) {
+  if (predictors == "") {
+    regressors = NULL
+  } else {
+    predictors = c(split_variable_names(predictors), "date")
+    regressors = dplyr::select(test_sample, predictors) %>% as.ts()
+  }
+  if ("try-error" %in% class(fit)) {
+    fcst = NA
+  } else {
+    cat('h = ', h, "\n")
+    cat('class(fit) = ', class(fit), "\n")
+    cat('is.null(regressors) = ', is.null(regressors), "\n")
+    
+    if (is.null(regressors)) {
+      fcst = forecast(fit, h = h)
+    } else {
+      fcst = forecast(fit, xreg = regressors, h = h)
+    }
+  }
+  return(fcst)
+}
 
 tbats_estimator = function(train_sample, predicted, options, predictors) {
   options = param_string_2_tibble(options)
@@ -151,6 +177,16 @@ tbats_estimator = function(train_sample, predicted, options, predictors) {
   fit = tbats(y) 
   return(fit)
 }
+
+tbats_forecastor = function(fit, test_sample, predicted, predicted_1d, options, predictors, h) {
+  if ("try-error" %in% class(fit)) {
+    fcst = NA
+  } else {
+    fcst = forecast(fit, h = h)
+  }
+  return(fcst)
+}
+
 
 ets_estimator = function(train_sample, predicted, options, predictors) {
   options = param_string_2_tibble(options)
@@ -160,6 +196,14 @@ ets_estimator = function(train_sample, predicted, options, predictors) {
 }
 
 
+ets_forecastor = function(fit, test_sample, predicted, predicted_1d, options, predictors, h) {
+  if ("try-error" %in% class(fit)) {
+    fcst = NA
+  } else {
+    fcst = forecast(fit, h = h)
+  }
+  return(fcst)
+}
 
 
 
@@ -468,12 +512,16 @@ glimpse(forecasting_dots_unnested)
 # forecasting_dots = fill_fits(forecasting_dots, "arima", arima_estimator)
 # forecasting_dots = fill_fits(forecasting_dots, "tbats", tbats_estimator)
 
-construct_train_sample = function(full_data, train_first_date, train_last_date, predicted, predictors) {
+construct_sample = function(full_data, sample_first_date, sample_last_date, predicted, predictors) {
   vars = c(split_variable_names(predictors), split_variable_names(predicted), "date")
-  train_sample = dplyr::select(full_data, vars) %>% filter(date >= train_first_date, date <= train_last_date)
+  train_sample = dplyr::select(full_data, vars) %>% filter(date >= sample_first_date, date <= sample_last_date)
   # train_sample = augment_tsibble_4_forecasting(train_sample, h_max = 0)
   return(train_sample)
 }
+
+
+
+
 
 # here h may be either one number 1 or a vector 1, 2, 3
 # the result is different :)
@@ -498,10 +546,10 @@ estimate_one_fit = function(train_sample, predicted, predictors, options, model)
 
 
 
-forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_1d, h = 1) {
+forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_1d, h = 1, test_sample) {
   forecastor = model_2_forecastor(model)
   forecast = do.call(forecastor, 
-                list(fit = fit, predicted_1d = predicted_1d, h = h, 
+                list(fit = fit, predicted_1d = predicted_1d, h = h, test_sample = test_sample, 
                      predicted = predicted, options = options, predictors = predictors))
   return(forecast)
 }
@@ -520,28 +568,50 @@ save_if_requested = function(fit, fits_folder, fit_file, save_to) {
 
 # "memory"
 
-# step 1. create train sample
+# step 1. create tt sample
+# tt sample = train + test sample united
 forecasting_dots_upd = mutate(forecasting_dots_unnested,
-                          train_sample = pmap(list(train_first_date, train_last_date, predicted, predictors_full), 
-                                              ~ construct_train_sample(full_data = forecasters_tsibble, ..1, ..2, ..3, ..4)))
+                          tt_sample = pmap(list(train_first_date, train_last_date, predicted, predictors_full, h_list, time_unit), 
+                                              ~ construct_sample(full_data = forecasters_tsibble, 
+                                                                       sample_first_date = ..1, 
+                                                                       sample_last_date = ..2 + ..5 * ..6, 
+                                                                       predicted = ..3, 
+                                                                       predictors = ..4)))
 
 # step 1.5 estimate model 
 glimpse(forecasting_dots_upd)
 forecasting_dots_upd = mutate(forecasting_dots_upd,
-                              fit = pmap(list(train_sample = train_sample,
-                                              predicted = predicted,
-                                              predictors = predictors_full,
-                                              options = options,
-                                              model = model), estimate_one_fit))
+                              fit = pmap(list(tt_sample, train_last_date, predicted, predictors_full, options, model),
+                                         ~ estimate_one_fit(train_sample = filter(..1, date <= ..2), 
+                                                            predicted = ..3, predictors = ..4, options = ..5, model = ..6)))
 
-# step 2 construct test sample
 
 # step 2.5 forecast (as object)
+forecasting_dots_upd = mutate(forecasting_dots_upd,
+                              fcst_object = pmap(list(tt_sample, h_list, predicted, predictors_full, options, model, fit, predicted_list),
+                                         ~ forecast_one_fit(test_sample = tail(..1, ..2), h = ..2, fit = ..7,
+                                                            predicted_1d = ..8,
+                                                            predicted = ..3, predictors = ..4, options = ..5, model = ..6)))
 
 
-# step 3. forecast objecto to 
+forecasting_dots_upd$fcst_object = as.list(rep(NA, nrow(forecasting_dots_upd)))
+for (fit_no in 1:nrow(forecasting_dots_upd)) {
+  row = forecasting_dots_upd[fit_no, ]
+  cat(fit_no, ":\n")
+  forecasting_dots_upd$fcst_object[[fit_no]] = forecast_one_fit(test_sample = tail(row$tt_sample[[1]], row$h_list),
+                                                              h = row$h_list,
+                                                              fit = row$fit[[1]],
+                                                              predicted = row$predicted,
+                                                              predictors = row$predictors_full, 
+                                                              predicted_1d = row$predicted_list,
+                                                              options = row$options,
+                                                              model = row$model)
+}
+
+
+# step 3. forecast objec to point forecast 
 forecasting_dots = mutate(forecasting_dots, 
-                          point_forecast = pmap(list(fcst_object = fcst, h = h), forecast_2_scalar))
+                          point_forecast = pmap(list(fcst_object, h_list), ~ forecast_2_scalar(..1, ..2)))
 
 # "file"
 # step 5
