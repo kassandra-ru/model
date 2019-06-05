@@ -105,12 +105,14 @@ model_list
 arima_estimator = function(train_sample, predicted, options, predictors) {
   selected_vars = c(predicted, "date")
   y = dplyr::select(train_sample, selected_vars) %>% as.ts()
-  
+
   if (predictors == "") {
     regressors = NULL
   } else {
-    predictors = c(split_variable_names(predictors), "date")
-    regressors = dplyr::select(train_sample, predictors) %>% as.ts()
+    predictors = split_variable_names(predictors)
+    # important: we always use regressors as matrix (even for one predictor!)
+    # this allows to store column names!
+    regressors = as_tibble(train_sample) %>% dplyr::select(predictors) %>% as.ts()
   }
   
   options = param_string_2_tibble(options)
@@ -156,6 +158,7 @@ arima_estimator = function(train_sample, predicted, options, predictors) {
 # arima_estimator(tr_sample, "ind_prod", "p=1,d=0,q=0,pseas=1,dseas=0,qseas=1", "exch_rate + agriculture")
 
 arima_forecastor = function(fit, test_sample, predicted, predicted_, options, predictors, h, frequency) {
+  
   if (predictors == "") {
     regressors = NULL
   } else {
@@ -170,10 +173,7 @@ arima_forecastor = function(fit, test_sample, predicted, predicted_, options, pr
   if ("try-error" %in% class(fit)) {
     fcst = NA
   } else {
-    cat('h = ', h, "\n")
-    cat('class(fit) = ', class(fit), "\n")
-    cat('is.null(regressors) = ', is.null(regressors), "\n")
-    
+
     if (is.null(regressors)) {
       fcst = forecast(fit, h = h)
     } else {
@@ -607,6 +607,10 @@ glimpse(forecasting_dots_upd)
 forecasting_dots_upd = mutate(forecasting_dots_upd, 
                           point_forecast = pmap_dbl(list(fcst_object, h_), ~ forecast_2_scalar(..1, ..2)))
 glimpse(forecasting_dots_upd)
+
+
+
+
 
 
 # "file"
