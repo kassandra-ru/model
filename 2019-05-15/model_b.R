@@ -532,7 +532,7 @@ estimate_one_fit = function(train_sample, predicted, predictors, options, model)
   return(fit)
 }
 
-# STOPPED here
+
 
 forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_, h = 1, test_sample, frequency) {
   forecastor = model_2_forecastor(model)
@@ -571,11 +571,13 @@ glimpse(forecasting_dots_upd)
 # step 1.5 estimate model 
 
 
-
+pr_bar = progress_estimated(nrow(forecasting_dots_upd))
 forecasting_dots_upd = mutate(forecasting_dots_upd,
                               fit = pmap(list(tt_sample, train_last_date, predicted, predictors_full, options, model),
-                                         ~ estimate_one_fit(train_sample = filter(..1, date <= ..2), 
-                                                            predicted = ..3, predictors = ..4, options = ..5, model = ..6)))
+                                         ~ {
+                                           pr_bar$tick()$print()
+                                           estimate_one_fit(train_sample = filter(..1, date <= ..2), 
+                                                            predicted = ..3, predictors = ..4, options = ..5, model = ..6)}))
 
 
 # step 2.5 forecast (as object)
@@ -611,7 +613,7 @@ glimpse(forecasting_dots_upd)
 
 
 
-
+# STOPPED here
 
 # "file"
 # step 5
