@@ -83,7 +83,7 @@ export(rus_ts, file = paste0(data_snapshot_folder, "rus_monthly.csv"))
 
 # create model table ------------------------------------------------------
 
-model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
+model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h, 
                      "arima", "cpi", "", "", "1,2,3,4,5,6",
                      "ets", "ind_prod", "", "", "1,2,3,4,5,6",
                      "arima", "cpi", "", "p=1,d=1,q=1,pseas=1,dseas=1,qseas=1,method='ML'", "1,2,3,4,5,6",
@@ -91,9 +91,14 @@ model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
                      "arima", "cpi", "lag2_ind_prod", "p=1,d=0,q=1,pseas=1,dseas=1,qseas=1", "1,2",
                      "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
+model_list = mutate(model_list, window_type = "sliding", frequency = 12, cv_proportion = 0.2)
 
 model_list = filter(model_list, model %in% c("arima"))
 model_list
+
+# convention: predicted, h are strings with possible , or +
+# predicted_, h_ are melted versions of predicted and h
+# h = "1,2,3,4,5" => h_ will be a vector with 5 elements
 
 arima_estimator = function(train_sample, predicted, options, predictors) {
   selected_vars = c(predicted, "date")
@@ -102,7 +107,7 @@ arima_estimator = function(train_sample, predicted, options, predictors) {
   if (predictors == "") {
     regressors = NULL
   } else {
-    predictors = split_variable_names(predictors)
+    predictors = c(split_variable_names(predictors), "date")
     regressors = dplyr::select(train_sample, predictors) %>% as.ts()
   }
   
@@ -245,19 +250,19 @@ acronyms
 
 first_useful_date = ymd("2011-10-01") # all previous info will be ignored
 forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment of time
-proportion_cv = 0.2 # доля ряда, используемая для оценки качества прогнозов с помощью кросс-валидации
 
 
-
-
-# unabbreviate functions ---------------------------------------------------------
-model_list = mutate(model_list, predictors_full = unabbreviate_vector(predictors, acronyms))
 
 
 
 # precalculated vectors and consts ----------------------------------------
 
-all_h = pull(model_list, h) %>% str_split(",") %>% unlist() %>% as.numeric() %>% unique()
+numbers_string_2_vector = function(numbers_string) {
+  return(numbers_string %>% str_split(",") %>% unlist() %>% as.numeric() %>% unique())
+}
+
+all_h = pull(model_list, h) %>% numbers_string_2_vector()
+all_h
 h_max = all_h %>% max()
 
 split_variable_names = function(predictors_vector, acronyms = NULL, split_by = "[\\+,]") {
@@ -300,13 +305,14 @@ forecasters_tsibble = filter(rus_ts, date >= first_useful_date)
 
 predictors = split_variable_names(model_list$predictors, acronyms = acronyms)
 predicted = split_variable_names(model_list$predicted, acronyms = acronyms)
-useful_vars = c(predictors, predicted) %>% unique()
+useful_vars = c(predictors, predicted, "date") %>% unique()
 
 forecasters_tsibble = augment_tsibble_4_forecasting(forecasters_tsibble, h_max = h_max)  # точно с запасом :)
 forecasters_tsibble = select(forecasters_tsibble, useful_vars)
 glimpse(forecasters_tsibble)
 
 frequency = frequency(forecasters_tsibble)
+frequency
 # при наличии рваного края (последнее наблюдение приходится на разные даты у разных переменных)
 # дополним набор данных лишними строками по максимуму
 # а прогнозировать будем только заказанный h для каждой переменной, то есть forecasting_dot будет по заказанным h
@@ -345,7 +351,7 @@ variable_availability
 
 # convert to numeric if possible :)
 gentle_as_numeric = function(chr_vector) {
-  num_vector = as.numeric(chr_vector)
+  num_vector = suppressWarnings(as.numeric(chr_vector)) # generally it's a bad idea to use suppressWarnings, but this function is ok!
   res_list = as.list(chr_vector)
   res_list[!is.na(num_vector)] = num_vector[!is.na(num_vector)]
   return(res_list)
@@ -385,17 +391,20 @@ param_string_2_tibble = function(param_string) {
 # здесь мы составляем список точек прогнозирования. 
 # одна точка — это прогноз конкретной переменной на конкретную дату по конкретной модели с опциями
 
-model_list = mutate(model_list, multivariate = str_detect(predicted, "[\\+,]"))
-model_list = mutate(model_list, has_predictors = (predictors != ""))
-model_list = mutate(model_list, options_tibble = map(options, ~ param_string_2_tibble(.x)))
+# unabbreviate functions ---------------------------------------------------------
+model_list_plus = mutate(model_list, predictors_full = unabbreviate_vector(predictors, acronyms))
+model_list_plus = mutate(model_list_plus, multivariate = str_detect(predicted, "[\\+,]"))
+model_list_plus = mutate(model_list_plus, has_predictors = (predictors != ""))
+model_list_plus = mutate(model_list_plus, options_tibble = map(options, ~ param_string_2_tibble(.x)))
+model_list_plus = mutate(model_list_plus, h_max = map_int(h, ~ numbers_string_2_vector(.x) %>% as.integer() %>% max()))
 
 # если multivariate модель поддерживает рваный край, то можно ей добавить опцию rugged в опциях
 # TODO: подумать
 
 
 
-calculate_model_dates = function(model_list, variable_availability, frequency, proportion_cv = 0.2) {
-  model_list = mutate(model_list, frequency = frequency, 
+calculate_model_dates = function(model_list, variable_availability) {
+  model_list = mutate(model_list, 
                 time_unit = case_when(frequency == 12 ~ months(1),
                                       frequency == 4 ~ months(3)))
   
@@ -405,59 +414,46 @@ calculate_model_dates = function(model_list, variable_availability, frequency, p
                                   vars_first_date = map(variable_info, ~ max(.x$first_obs)),
                                   vars_last_date = map(variable_info, ~ min(.x$last_obs)),
                                   vars_first_row = map_int(variable_info, ~ max(.x$first_obs_row)),
-                                  vars_last_row = map_int(variable_info, ~ min(.x$last_obs_row)),
-                                  h_max = map_int(h, ~ str_split(.x, "[\\+,]") %>% unlist() %>% as.integer() %>% max())) %>% unnest(vars_first_date, vars_last_date)
+                                  vars_last_row = map_int(variable_info, ~ min(.x$last_obs_row))) %>% unnest(vars_first_date, vars_last_date)
   model_list = dplyr::select(model_list, -all_used_vars, -variable_info)
 
-  # model_list = mutate(model_list, vars_first_date = as.Date(NA), vars_last_date = as.Date(NA), 
-  #                     vars_first_row = NA, vars_last_row = NA)
-  # for (model_no in 1:nrow(model_list)) {
-  #   predictors = split_variable_names(model_list$predictors_full[model_no])
-  #   predicted = split_variable_names(model_list$predicted[model_no])
-  #   all_used_vars = c(predictors, predicted) %>% unique()
-  #   variable_info = filter(variable_availability, var_name %in% all_used_vars)
-  #   model_list$vars_first_date[model_no] = max(variable_info$first_obs) 
-  #   model_list$vars_last_date[model_no] = min(variable_info$last_obs) 
-  #   model_list$vars_first_row[model_no] = max(variable_info$first_obs_row) 
-  #   model_list$vars_last_row[model_no] = min(variable_info$last_obs_row) 
-  #   
-  #   all_h = model_list$h[model_no] %>% str_split("[\\+,]") %>% unlist() %>% as.numeric()
-  #   model_list$h_max[model_no] = max(all_h)
-  # }
-  
-  
+
   model_list = mutate(model_list, useful_rows = vars_last_row - vars_first_row + 1,
-                      cv_rows = round(proportion_cv * useful_rows),
+                      cv_rows = round(cv_proportion * useful_rows),
                       initial_window_length = useful_rows - cv_rows,
                       future_first_date = vars_last_date + time_unit,
                       future_last_date = vars_last_date + h_max * time_unit,
-                      cv_first_date = case_when(proportion_cv > 0 ~ vars_last_date - (cv_rows - 1) * time_unit,
+                      cv_first_date = case_when(cv_proportion > 0 ~ vars_last_date - (cv_rows - 1) * time_unit,
                                                   TRUE ~ as.Date(NA)),
-                      cv_last_date = case_when(proportion_cv > 0 ~ vars_last_date,
+                      cv_last_date = case_when(cv_proportion > 0 ~ vars_last_date,
                                                  TRUE ~ as.Date(NA)),
                       initial_window_first_date = vars_first_date,
                       initial_window_last_date = initial_window_first_date + (initial_window_length - 1) * time_unit)
   return(model_list)
 }
 
-model_list_dated = calculate_model_dates(model_list, variable_availability, frequency = 12, proportion_cv = 0.2)
+model_list_dated = calculate_model_dates(model_list_plus, variable_availability)
 
 
 # calculate forecasting dots ----------------------------------------------
 
 
+# check up to here!!!!
 
-model_list_dated = mutate(model_list_dated, window_type = "sliding") # add sliding or stretching window 
+# model_list_dated = mutate(model_list_dated, window_type = "sliding") # add sliding or stretching window 
 # we may use separate window for each model. Why not? :)
 
 
 melt_h_predicted = function(model_list_dated) {
-  model_list_upd = mutate(model_list_dated, h_list = as.list(str_split(h, ",")))
-  model_list_upd = unnest(model_list_upd, h_list, .drop = FALSE) %>% mutate(h_list = as.numeric(h_list))
-  model_list_upd = mutate(model_list_upd, predicted_list = as.list(str_split(predicted, "[\\+,]")))
-  model_list_upd = unnest(model_list_upd, predicted_list, .drop = FALSE)
+  model_list_upd = mutate(model_list_dated, h_ = as.list(str_split(h, ",")))
+  model_list_upd = unnest(model_list_upd, h_, .drop = FALSE) %>% mutate(h_ = as.integer(h_))
+  model_list_upd = mutate(model_list_upd, predicted_ = as.list(str_split(predicted, "[\\+,]")))
+  model_list_upd = unnest(model_list_upd, predicted_, .drop = FALSE)
   return(model_list_upd)  
 }
+
+
+
 
 glimpse(model_list_dated)
 model_list_h_predicted = melt_h_predicted(model_list_dated)
@@ -466,15 +462,15 @@ glimpse(model_list_h_predicted)
 
 
 # функция создаёт табличку обучающих выборок и точек прогнозирования
-forecasting_goal_2_dots = function(frequency, h_list, time_unit, future_first_date, cv_first_date, cv_last_date, 
+forecasting_goal_2_dots = function(frequency, h, time_unit, future_first_date, cv_first_date, cv_last_date, 
                                    initial_window_first_date, window_type, initial_window_length, cv_rows) {
   time_string = case_when(frequency == 12 ~ "1 months",
                           frequency == 4 ~ "3 months")
-  new_date = future_first_date  + (h_list - 1) * time_unit
+  new_date = future_first_date  + (h - 1) * time_unit
   forecasting_dots = tibble(dot_date = c(seq(from = cv_first_date, to = cv_last_date, by = time_string), new_date))
     
   
-  forecasting_dots = mutate(forecasting_dots, h = h_list, in_cv = c(rep(TRUE, cv_rows), FALSE))
+  forecasting_dots = mutate(forecasting_dots, in_cv = c(rep(TRUE, cv_rows), FALSE))
   forecasting_dots = mutate(forecasting_dots, train_last_date = dot_date - h * time_unit)
   if (window_type == "stretching") {
     forecasting_dots = mutate(forecasting_dots, train_first_date = initial_window_first_date)
@@ -488,7 +484,7 @@ forecasting_goal_2_dots = function(frequency, h_list, time_unit, future_first_da
 
 
 forecasting_dots = mutate(model_list_h_predicted, 
-                          dots = pmap(list(frequency = frequency, h_list = h_list, time_unit = time_unit, 
+                          dots = pmap(list(frequency = frequency, h = h_, time_unit = time_unit, 
                                       future_first_date = future_first_date, cv_first_date = cv_first_date, cv_last_date = cv_last_date, 
                                       initial_window_first_date = initial_window_first_date, 
                                       window_type = window_type, initial_window_length = initial_window_length,
@@ -525,14 +521,6 @@ construct_sample = function(full_data, sample_first_date, sample_last_date, pred
 
 # here h may be either one number 1 or a vector 1, 2, 3
 # the result is different :)
-# НЕВЕРНАЯ ФУНКЦИЯ!!!! регрессоры то надо дописывать от train sample, чтобы например, тренд дальше шёл или цикличные переменные корректно продолжались
-construct_test_sample = function(full_data, future_first_date, h, predicted, predictors) {
-  vars = c(split_variable_names(predictors), "date")
-  future_data = dplyr::select(future_data, vars)
-  future_data = dplyr::filter(full_data, date >= future_first_date) %>% dplyr::top_n(max(h), date)
-  future_data = future_data[h, ]
-  return(future_data)
-}
 
 
 
