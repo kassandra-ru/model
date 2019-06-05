@@ -91,7 +91,9 @@ model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h,
                      "arima", "cpi", "lag2_ind_prod", "p=1,d=0,q=1,pseas=1,dseas=1,qseas=1", "1,2",
                      "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
-model_list = mutate(model_list, window_type = "sliding", frequency = 12, cv_proportion = 0.2)
+model_list = mutate(model_list, window_type = "sliding", frequency = 12, cv_proportion = 0.2) # add sliding or stretching window 
+# we may use separate window for each model. Why not? :)
+
 
 model_list = filter(model_list, model %in% c("arima"))
 model_list
@@ -153,12 +155,17 @@ arima_estimator = function(train_sample, predicted, options, predictors) {
 }
 # arima_estimator(tr_sample, "ind_prod", "p=1,d=0,q=0,pseas=1,dseas=0,qseas=1", "exch_rate + agriculture")
 
-arima_forecastor = function(fit, test_sample, predicted, predicted_1d, options, predictors, h) {
+arima_forecastor = function(fit, test_sample, predicted, predicted_, options, predictors, h, frequency) {
   if (predictors == "") {
     regressors = NULL
   } else {
-    predictors = c(split_variable_names(predictors), "date")
-    regressors = dplyr::select(test_sample, predictors) %>% as.ts()
+    predictors = split_variable_names(predictors)
+    # here we have the dirty trick (!)
+    # if we have just one obs in test_sample then frequency in tsibble is equal to "?"
+    # and automatic conversion to ts type is not possible
+    # so we have automatic conversion to tibble and then to ts
+    regressors = tibble::as_tibble(test_sample) %>% 
+      dplyr::select(predictors) %>% as.ts(frequency = frequency)
   }
   if ("try-error" %in% class(fit)) {
     fcst = NA
@@ -183,7 +190,7 @@ tbats_estimator = function(train_sample, predicted, options, predictors) {
   return(fit)
 }
 
-tbats_forecastor = function(fit, test_sample, predicted, predicted_1d, options, predictors, h) {
+tbats_forecastor = function(fit, test_sample, predicted, predicted_, options, predictors, h) {
   if ("try-error" %in% class(fit)) {
     fcst = NA
   } else {
@@ -201,7 +208,7 @@ ets_estimator = function(train_sample, predicted, options, predictors) {
 }
 
 
-ets_forecastor = function(fit, test_sample, predicted, predicted_1d, options, predictors, h) {
+ets_forecastor = function(fit, test_sample, predicted, predicted_, options, predictors, h) {
   if ("try-error" %in% class(fit)) {
     fcst = NA
   } else {
@@ -438,10 +445,7 @@ model_list_dated = calculate_model_dates(model_list_plus, variable_availability)
 # calculate forecasting dots ----------------------------------------------
 
 
-# check up to here!!!!
 
-# model_list_dated = mutate(model_list_dated, window_type = "sliding") # add sliding or stretching window 
-# we may use separate window for each model. Why not? :)
 
 
 melt_h_predicted = function(model_list_dated) {
@@ -472,6 +476,9 @@ forecasting_goal_2_dots = function(frequency, h, time_unit, future_first_date, c
   
   forecasting_dots = mutate(forecasting_dots, in_cv = c(rep(TRUE, cv_rows), FALSE))
   forecasting_dots = mutate(forecasting_dots, train_last_date = dot_date - h * time_unit)
+  if (!window_type %in% c("stretching", "sliding")) {
+    stop("window_type should be 'stretching' or 'sliding'")
+  }
   if (window_type == "stretching") {
     forecasting_dots = mutate(forecasting_dots, train_first_date = initial_window_first_date)
   } else if (window_type == "sliding") {
@@ -500,7 +507,7 @@ forecasting_dots_unnested = mutate(forecasting_dots_unnested,
 glimpse(forecasting_dots_unnested)
 
 
-# STOPPED here
+
 
 # fill dots ---------------------------------------------------------------
 
@@ -517,13 +524,6 @@ construct_sample = function(full_data, sample_first_date, sample_last_date, pred
 
 
 
-
-
-# here h may be either one number 1 or a vector 1, 2, 3
-# the result is different :)
-
-
-
 estimate_one_fit = function(train_sample, predicted, predictors, options, model) {
   estimator = model_2_estimator(model)
   fit = do.call(estimator, 
@@ -532,19 +532,19 @@ estimate_one_fit = function(train_sample, predicted, predictors, options, model)
   return(fit)
 }
 
+# STOPPED here
 
-
-forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_1d, h = 1, test_sample) {
+forecast_one_fit = function(fit, predicted, predictors, options, model, predicted_, h = 1, test_sample, frequency) {
   forecastor = model_2_forecastor(model)
   forecast = do.call(forecastor, 
-                list(fit = fit, predicted_1d = predicted_1d, h = h, test_sample = test_sample, 
-                     predicted = predicted, options = options, predictors = predictors))
+                list(fit = fit, predicted_ = predicted_, h = h, test_sample = test_sample, 
+                     predicted = predicted, options = options, predictors = predictors, frequency = frequency))
   return(forecast)
 }
 
 
-# save_to = memory / disk
-save_if_requested = function(fit, fits_folder, fit_file, save_to) {
+save_if_requested = function(fit, fits_folder, fit_file, save_to = c("memory", "disk")) {
+  save_to = match.arg(save_to)
   if (save_to == "memory") {
     return(fit)
   } else {
@@ -559,7 +559,7 @@ save_if_requested = function(fit, fits_folder, fit_file, save_to) {
 # step 1. create tt sample
 # tt sample = train + test sample united
 forecasting_dots_upd = mutate(forecasting_dots_unnested,
-                          tt_sample = pmap(list(train_first_date, train_last_date, predicted, predictors_full, h_list, time_unit), 
+                          tt_sample = pmap(list(train_first_date, train_last_date, predicted, predictors_full, h_, time_unit), 
                                               ~ construct_sample(full_data = forecasters_tsibble, 
                                                                        sample_first_date = ..1, 
                                                                        sample_last_date = ..2 + ..5 * ..6, 
@@ -576,24 +576,26 @@ forecasting_dots_upd = mutate(forecasting_dots_upd,
 
 # step 2.5 forecast (as object)
 forecasting_dots_upd = mutate(forecasting_dots_upd,
-                              fcst_object = pmap(list(tt_sample, h_list, predicted, predictors_full, options, model, fit, predicted_list),
+                              fcst_object = pmap(list(tt_sample, h_, predicted, predictors_full, options, model, fit, predicted_,
+                                                      frequency),
                                          ~ forecast_one_fit(test_sample = tail(..1, ..2), h = ..2, fit = ..7,
-                                                            predicted_1d = ..8,
-                                                            predicted = ..3, predictors = ..4, options = ..5, model = ..6)))
+                                                            predicted_ = ..8,
+                                                            predicted = ..3, predictors = ..4, options = ..5, model = ..6, frequency = ..9)))
 
 
 forecasting_dots_upd$fcst_object = as.list(rep(NA, nrow(forecasting_dots_upd)))
 for (fit_no in 1:nrow(forecasting_dots_upd)) {
   row = forecasting_dots_upd[fit_no, ]
   cat(fit_no, ":\n")
-  forecasting_dots_upd$fcst_object[[fit_no]] = forecast_one_fit(test_sample = tail(row$tt_sample[[1]], row$h_list),
-                                                              h = row$h_list,
+  forecasting_dots_upd$fcst_object[[fit_no]] = forecast_one_fit(test_sample = tail(row$tt_sample[[1]], row$h_),
+                                                              h = row$h_,
                                                               fit = row$fit[[1]],
                                                               predicted = row$predicted,
                                                               predictors = row$predictors_full, 
-                                                              predicted_1d = row$predicted_list,
+                                                              predicted_ = row$predicted_,
                                                               options = row$options,
-                                                              model = row$model)
+                                                              model = row$model,
+                                                              frequency = row$frequency)
 }
 
 
