@@ -566,8 +566,12 @@ forecasting_dots_upd = mutate(forecasting_dots_unnested,
                                                                        predicted = ..3, 
                                                                        predictors = ..4)))
 
-# step 1.5 estimate model 
 glimpse(forecasting_dots_upd)
+
+# step 1.5 estimate model 
+
+
+
 forecasting_dots_upd = mutate(forecasting_dots_upd,
                               fit = pmap(list(tt_sample, train_last_date, predicted, predictors_full, options, model),
                                          ~ estimate_one_fit(train_sample = filter(..1, date <= ..2), 
@@ -597,11 +601,13 @@ for (fit_no in 1:nrow(forecasting_dots_upd)) {
                                                               model = row$model,
                                                               frequency = row$frequency)
 }
-
+glimpse(forecasting_dots_upd)
 
 # step 3. forecast objec to point forecast 
-forecasting_dots = mutate(forecasting_dots, 
-                          point_forecast = pmap(list(fcst_object, h_list), ~ forecast_2_scalar(..1, ..2)))
+forecasting_dots_upd = mutate(forecasting_dots_upd, 
+                          point_forecast = pmap_dbl(list(fcst_object, h_), ~ forecast_2_scalar(..1, ..2)))
+glimpse(forecasting_dots_upd)
+
 
 # "file"
 # step 5
