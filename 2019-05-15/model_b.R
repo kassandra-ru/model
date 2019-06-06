@@ -84,11 +84,11 @@ export(rus_ts, file = paste0(data_snapshot_folder, "rus_monthly.csv"))
 # create model table ------------------------------------------------------
 
 model_list = tribble(~model, ~predicted, ~predictors, ~options, ~h, 
-                     "arima", "cpi", "", "", "1,2,3,4,5,6",
+                     "arima", "cpi", "lag2_ind_prod", "", "1,2",
                      "ets", "ind_prod", "", "", "1,2,3,4,5,6",
-                     "arima", "cpi", "", "p=1,d=1,q=1,pseas=1,dseas=1,qseas=1,method='ML'", "1,2,3,4,5,6",
+                     "arima", "cpi", "", "p=1,d=1,q=0,pseas=1,dseas=1,qseas=0,method='ML'", "1,2,3,4,5,6",
                      "var", "cpi+ind_prod", "", "p=5", "1,2,3,4,5,6",
-                     "arima", "cpi", "lag2_ind_prod", "p=1,d=0,q=1,pseas=1,dseas=1,qseas=1", "1,2",
+                     "arima", "cpi", "lag2_ind_prod", "p=1,d=0,q=0,pseas=1,dseas=1,qseas=0", "1,2",
                      "ranger", "cpi", "lag2_ind_prod+trend_lin+FOURIER_M", "", "1,2",
                      "tbats", "cpi", "", "", "1,2,3,4,5,6")
 model_list = mutate(model_list, window_type = "sliding", frequency = 12, cv_proportion = 0.2) # add sliding or stretching window 
@@ -356,42 +356,6 @@ variable_availability
 # model dates ---------------------------------------------------------
 
 
-# convert to numeric if possible :)
-gentle_as_numeric = function(chr_vector) {
-  num_vector = suppressWarnings(as.numeric(chr_vector)) # generally it's a bad idea to use suppressWarnings, but this function is ok!
-  res_list = as.list(chr_vector)
-  res_list[!is.na(num_vector)] = num_vector[!is.na(num_vector)]
-  return(res_list)
-}
-# gentle_as_numeric(c("5", "ggg", "'sss'"))
-
-# test = c("aaa", "'bbb'")
-remove_quotes = function(chr_vector) {
-  quoted = str_starts(chr_vector, "[']") & str_ends(chr_vector, "[']")
-  chr_vector[quoted] = str_sub(chr_vector[quoted], start = 2, end = -2)
-  return(chr_vector)
-}
-# remove_quotes(test)
-
-# param_string = "q=3, p=4, v='ml', qur=mlp"
-param_string_2_tibble = function(param_string) {
-  if (param_string == "") {
-    params = as_tibble(list())
-  } else {
-    splitted = str_split(param_string, ",") %>% unlist() %>% str_trim()
-    lhs_rhs = str_split(splitted, "=") %>% unlist()
-    n_pars = length(lhs_rhs) / 2
-    rhs = remove_quotes(lhs_rhs[2 * (1:n_pars)])
-    lhs = lhs_rhs[2 * (1:n_pars) - 1]
-    params = as.list(rhs)
-    params = gentle_as_numeric(params)
-    names(params) = lhs
-    params = as_tibble(params)
-  }
-  return(params)
-}
-# params = param_string_2_tibble(param_string)
-
 
 
 
@@ -604,6 +568,8 @@ for (fit_no in 1:nrow(forecasting_dots_upd)) {
                                                               frequency = row$frequency)
 }
 glimpse(forecasting_dots_upd)
+
+
 
 # step 3. forecast objec to point forecast 
 forecasting_dots_upd = mutate(forecasting_dots_upd, 
