@@ -102,121 +102,6 @@ model_list
 # predicted_, h_ are melted versions of predicted and h
 # h = "1,2,3,4,5" => h_ will be a vector with 5 elements
 
-arima_estimator = function(train_sample, predicted, options, predictors) {
-  selected_vars = c(predicted, "date")
-  y = dplyr::select(train_sample, selected_vars) %>% as.ts()
-
-  if (predictors == "") {
-    regressors = NULL
-  } else {
-    predictors = split_variable_names(predictors)
-    # important: we always use regressors as matrix (even for one predictor!)
-    # this allows to store column names!
-    regressors = as_tibble(train_sample) %>% dplyr::select(predictors) %>% as.ts()
-  }
-  
-  options = param_string_2_tibble(options)
-  
-  if ("p" %in% colnames(options)) {
-    has_order = TRUE
-    pdq = c(options$p, options$d, options$q)
-  } else {
-    has_order = FALSE
-    pdq = c(0, 0, 0)
-  }
-  
-  if ("pseas" %in% colnames(options)) {
-    pdq_seas = c(options$pseas, options$dseas, options$qseas)
-  } else {
-    pdq_seas = c(0, 0, 0)
-  }
-  
-  if ("method" %in% colnames(options)) {
-    method = options$method
-  } else {
-    method = "CSS-ML"
-  }
-  
-  
-  if (!has_order) {
-    if (is.null(regressors)) {
-      fit = try(auto.arima(y = y, method = method))
-    } else {
-      fit = try(auto.arima(y = y, xreg = regressors, method = method))
-    }
-  }
-  if (has_order) {
-    if (is.null(regressors)) {
-      fit = try(Arima(y = y, order = pdq, seasonal = pdq_seas, method = method))
-    } else {
-      fit = try(Arima(y = y, order = pdq, seasonal = pdq_seas, method = method, xreg = regressors))
-    }
-  }
-  
-  return(fit)
-}
-# arima_estimator(tr_sample, "ind_prod", "p=1,d=0,q=0,pseas=1,dseas=0,qseas=1", "exch_rate + agriculture")
-
-arima_forecastor = function(fit, test_sample, predicted, predicted_, options, predictors, h, frequency) {
-  
-  if (predictors == "") {
-    regressors = NULL
-  } else {
-    predictors = split_variable_names(predictors)
-    # here we have the dirty trick (!)
-    # if we have just one obs in test_sample then frequency in tsibble is equal to "?"
-    # and automatic conversion to ts type is not possible
-    # so we have automatic conversion to tibble and then to ts
-    regressors = tibble::as_tibble(test_sample) %>% 
-      dplyr::select(predictors) %>% as.ts(frequency = frequency)
-  }
-  if ("try-error" %in% class(fit)) {
-    fcst = NA
-  } else {
-
-    if (is.null(regressors)) {
-      fcst = forecast(fit, h = h)
-    } else {
-      fcst = forecast(fit, xreg = regressors, h = h)
-    }
-  }
-  return(fcst)
-}
-
-tbats_estimator = function(train_sample, predicted, options, predictors) {
-  options = param_string_2_tibble(options)
-  y = dplyr::select(train_sample, !!predicted) %>% as.ts()
-  fit = tbats(y) 
-  return(fit)
-}
-
-tbats_forecastor = function(fit, test_sample, predicted, predicted_, options, predictors, h) {
-  if ("try-error" %in% class(fit)) {
-    fcst = NA
-  } else {
-    fcst = forecast(fit, h = h)
-  }
-  return(fcst)
-}
-
-
-ets_estimator = function(train_sample, predicted, options, predictors) {
-  options = param_string_2_tibble(options)
-  y = dplyr::select(train_sample, !!predicted) %>% as.ts()
-  fit = ets(y) 
-  return(fit)
-}
-
-
-ets_forecastor = function(fit, test_sample, predicted, predicted_, options, predictors, h) {
-  if ("try-error" %in% class(fit)) {
-    fcst = NA
-  } else {
-    fcst = forecast(fit, h = h)
-  }
-  return(fcst)
-}
-
 
 
 general_model_info = tribble(~model, ~h_dependent, ~multivariate, ~allows_regressors, 
@@ -264,23 +149,11 @@ forecast_from_date = ymd("2019-04-01") # we play in a forecaster at this moment 
 
 # precalculated vectors and consts ----------------------------------------
 
-numbers_string_2_vector = function(numbers_string) {
-  return(numbers_string %>% str_split(",") %>% unlist() %>% as.numeric() %>% unique())
-}
 
 all_h = pull(model_list, h) %>% numbers_string_2_vector()
 all_h
 h_max = all_h %>% max()
 
-split_variable_names = function(predictors_vector, acronyms = NULL, split_by = "[\\+,]") {
-  if (!is.null(acronyms)) {
-    predictors_vector = unabbreviate_vector(predictors_vector, acronyms)
-  }
-  variable_names = str_split(predictors_vector, split_by) %>% unlist() %>% unique()
-  variable_names = variable_names[variable_names != ""]
-  variable_names = str_trim(variable_names)
-  return(variable_names)
-}
 
 
 
