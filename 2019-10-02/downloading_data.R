@@ -29,7 +29,7 @@ watchdog_file = paste0(path, "watchdog.csv")
 watchdog = import(watchdog_file)
 
 # download all
-download_log_new = download_statistics(path, watchdog, method = "wget")
+download_log_new = download_statistics(path, watchdog)
 
 # write log information (what has been successful...)
 glimpse(download_log_new)
