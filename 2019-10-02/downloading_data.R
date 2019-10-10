@@ -25,7 +25,7 @@ library(lubridate)
 
 path_day = paste0(path, "/", Sys.Date(), "/") # add current date to path
 
-watchdog_file = paste0(path, "watchdog.csv") 
+watchdog_file = paste0(path, "watchdog.csv")
 watchdog = import(watchdog_file)
 
 # download all
@@ -37,4 +37,3 @@ export(download_log_new, paste0(path_day, "download_log.csv"))
 
 # adding raw files to gitignore
 write_lines(na.omit(watchdog$file_raw), path = paste0(path_day, ".gitignore"))
-

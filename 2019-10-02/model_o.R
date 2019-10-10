@@ -57,8 +57,8 @@ h_all = 1:6
 # may ignore h
 
 
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
+model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
+                           "ets_fun", TRUE, "uni_model_2_scalar_forecast",
                            "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima101_101_fun", TRUE, "uni_model_2_scalar_forecast")
@@ -68,7 +68,7 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 
 
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
+cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test,
                                 window_type = window_type, series_data = rus_m_full_stable)
 cv_results_new = estimate_and_forecast(cv_results)
 
@@ -126,8 +126,8 @@ dates_test = tail(rus_q_full_stable$date, nobs_test)
 h_all = 1:4
 
 
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
+model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
+                           "ets_fun", TRUE, "uni_model_2_scalar_forecast",
                            "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima101_101_fun", TRUE, "uni_model_2_scalar_forecast")
@@ -136,7 +136,7 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 # TODO: exact ML in case where ARMA(1,1)-SARMA(1,1) fails
 
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
+cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test,
                                 window_type = window_type, series_data = rus_q_full_stable)
 cv_results_new = estimate_and_forecast(cv_results)
 mae_table = calculate_mae_table(cv_results_new)
@@ -192,8 +192,8 @@ h_all = 1:6
 # may ignore h
 
 
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
+model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
+                           "ets_fun", TRUE, "uni_model_2_scalar_forecast",
                            "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima101_010_fun", TRUE, "uni_model_2_scalar_forecast")
@@ -203,9 +203,9 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 
 
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
+cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test,
                                 window_type = window_type, series_data = rus_m_full_stable)
-                              
+
 cv_results_new = estimate_and_forecast(cv_results)
 
 mae_table = calculate_mae_table(cv_results_new)
@@ -258,8 +258,8 @@ dates_test = tail(invest_full_stable$date, nobs_test)
 h_all = 1:4
 
 
-model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor, 
-                           "ets_fun", TRUE, "uni_model_2_scalar_forecast", 
+model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
+                           "ets_fun", TRUE, "uni_model_2_scalar_forecast",
                            "tbats_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima_fun", TRUE, "uni_model_2_scalar_forecast",
                            "arima101_010_fun", TRUE, "uni_model_2_scalar_forecast")
@@ -268,7 +268,7 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 # TODO: exact ML in case where ARMA(1,1)-SARMA(1,1) fails
 
-cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test, 
+cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test,
                                 window_type = window_type, series_data = invest_full_stable, target = "invest")
 cv_results_new = estimate_and_forecast(cv_results)
 mae_table = calculate_mae_table(cv_results_new)
@@ -287,4 +287,3 @@ the_forecasts_new = estimate_and_forecast(the_forecasts)
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
 only_numbers
 write_csv(only_numbers, path = "estimation_results/forecasts_investment.csv")
-
