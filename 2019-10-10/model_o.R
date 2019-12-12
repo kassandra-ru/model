@@ -281,7 +281,7 @@ write_csv(mae_table, "estimation_results/mae_table_investment.csv")
 
 # models in tibble version ------------------------------------------------
 
-the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = invest_full_stable, target = "invest")
+the_forecasts = prepare_model_list2(h_all = h_all, model_fun_tibble = model_fun_tibble, series_data = invest_full_stable, target = "investment")
 the_forecasts_new = estimate_and_forecast(the_forecasts)
 
 only_numbers = select(the_forecasts_new, date, h, model_fun, point_forecast)
