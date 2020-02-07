@@ -1,0 +1,10 @@
+library(rio)  
+indprod <- rio::import("ind_okved2.xlsx", skip = 2, sheet = 1)
+  access_date = Sys.Date()
+  indprod_vector <- t(indprod[2, 3:ncol(indprod)])
+  
+  indprod_ts <- stats::ts(indprod_vector, start = c(2013, 1), frequency = 12)
+  indprod_tsibble <- tsibble::as_tsibble(indprod_ts)
+  indprod_tsibble = dplyr::rename(indprod_tsibble, date = index, ind_prod = value)
+  indprod_tsibble = dplyr::mutate(indprod_tsibble, access_date = access_date)
+write.csv(indprod_tsibble, 'ind_okved2.csv') 
