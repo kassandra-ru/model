@@ -1,9 +1,11 @@
-library(docxtractr)
 # devtools::install_github("kassandra-ru/kassandr")
 library(kassandr)
+
 library(tidyverse)
 library(rio)
 library(lubridate)
+library(docxtractr)
+
 
 info = Sys.info() # получаем информацию о системе
 
@@ -18,6 +20,13 @@ if (info[1] == "Windows") {
   set_libreoffice_path("C:/Program Files/LibreOffice/program/soffice.exe")  # windows
   path = "D:/Research/Kassandra/data/raw/"
 }
+
+
+
+path_day = paste0(path, "/", Sys.Date(), "/") # add current date to path
+
+watchdog_file = paste0(path, "watchdog.csv") 
+watchdog = import(watchdog_file)
 
 # download all
 download_log_new = download_statistics(path, watchdog)
