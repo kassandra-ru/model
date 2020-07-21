@@ -4,6 +4,7 @@
 
 csv файл имеет такую структуру
 
+```{csv}
 param, value, comment
 max_h_yearly, 3, maximal forecasting horizon for yearly data in years
 max_h_monthly, 12, maximal forecasting horizon for monthly data in months
@@ -11,6 +12,7 @@ max_h_quarterly, 4, maximal forecasting horizon for quarterly data in quarters
 expanding_window, TRUE, true for expanding cross validation window and false for sliding
 window_length, 4.5, starting window length for cross validation in years
 cv_start, 2010-01-01, starting date for cross-validation 
+```
 
 Параметры для унификации должны называться именно так, как в колонке param.
 Скрипт должен читать колонку value и менять своё поведение соответственно. 
