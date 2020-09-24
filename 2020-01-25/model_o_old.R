@@ -12,8 +12,8 @@ library(stringr) # character variables
 library(rlang) # шаманство с бум-бум!
 library(readxl) # чтение экселевских файлов
 
-#devtools::install_github("kassandra-ru/kassandr")
 library(kassandr)
+#devtools::install_github("kassandra-ru/kassandr")
 
 
 Sys.setlocale("LC_TIME", "C")
@@ -158,9 +158,9 @@ write_csv(only_numbers, path = "estimation_results/forecasts_gdp_rate_real.csv")
 
 # industrial product univariate models -------------------------------------------------------
 
-start_date = ymd("2015-01-01")
+start_date = ymd("2013-01-01")
 
-ind_prod = import("../../data/raw/2020-01-25/ind_baza_2018.csv")
+ind_prod = import("../../data/raw/2020-01-25/ind_okved2.csv")
 ind_prod_tsibble = mutate(ind_prod, date = yearmonth(date)) %>% as_tsibble(index = date)%>%rename(value = ind_prod)
 rus_m_full_stable = filter(ind_prod_tsibble, date >= start_date)
 

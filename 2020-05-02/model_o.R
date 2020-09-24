@@ -24,7 +24,7 @@ dir.create("estimation_results")
 
 start_date = ymd("2011-10-01")
 
-I_ipc = import("../../data/raw/2020-01-25/i_ipc.csv")
+I_ipc = import("../../data/raw/2020-05-02/i_ipc.csv")
 I_ipc_tsibble = mutate(I_ipc, date = yearmonth(date)) %>% as_tsibble(index = date)%>%rename(value = cpi)
 rus_m_full_stable = filter(I_ipc_tsibble, date >= start_date)
 
@@ -97,7 +97,7 @@ write_csv(only_numbers, path = "estimation_results/forecasts_cpi.csv")
 
 # gdp univariate models -------------------------------------------------------
 
-tab6b = import("../../data/raw/2020-01-25/tab6b.csv")
+tab6b = import("../../data/raw/2020-05-02/tab6b.csv")
 tab6b_tsibble = mutate(tab6b, date = yearquarter(date)) %>% as_tsibble(index = date)%>%rename(value = gdp_2016_price)
 tab6b_tsibble = rename(tab6b_tsibble, gdp_real_2016_price = value) %>% mutate(gdp_rate = (gdp_real_2016_price - lag(gdp_real_2016_price, 4))/lag(gdp_real_2016_price, 4))
 # из-за того, что берём лаг 4 шага назад первое наблюдение появляется довольно поздно :)
@@ -160,7 +160,7 @@ write_csv(only_numbers, path = "estimation_results/forecasts_gdp_rate_real.csv")
 
 start_date = ymd("2015-01-01")
 
-ind_prod = import("../../data/raw/2020-01-25/ind_baza_2018.csv")
+ind_prod = import("../../data/raw/2020-05-02/ind_baza_2018.csv")
 ind_prod_tsibble = mutate(ind_prod, date = yearmonth(date)) %>% as_tsibble(index = date)%>%rename(value = ind_prod)
 rus_m_full_stable = filter(ind_prod_tsibble, date >= start_date)
 
@@ -232,7 +232,7 @@ write_csv(only_numbers, path = "estimation_results/forecasts_ind_prod.csv")
 
 # investment univariate models -------------------------------------------------------
 
-invest = import("../../data/raw/2020-01-25/invest.csv")
+invest = import("../../data/raw/2020-05-02/invest.csv")
 invest_tsibble = mutate(invest, date = yearquarter(date)) %>% as_tsibble(index = date)
 
 invest_tsibble %>% head()
