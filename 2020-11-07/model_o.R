@@ -1,3 +1,5 @@
+# probably we need packrat (!) to make packages stable
+
 library(tidyverse) # data manipulation
 library(rio) # import - export data
 library(tsibble) # ts data frames
