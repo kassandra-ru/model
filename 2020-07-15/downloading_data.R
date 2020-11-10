@@ -1,5 +1,5 @@
 library(docxtractr)
-# devtools::install_github("kassandra-ru/kassandr")
+devtools::install_github("kassandra-ru/kassandr")
 library(kassandr)
 library(tidyverse)
 library(rio)
