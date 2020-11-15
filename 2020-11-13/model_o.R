@@ -65,7 +65,7 @@ model_fun_tibble = tribble(~model_fun, ~h_agnostic, ~forecast_extractor,
 
 cv_results = prepare_model_list(h_all = h_all, model_fun_tibble = model_fun_tibble, dates_test = dates_test,
                                 window_type = window_type, series_data = rus_q_full_stable)
-cv_results_new = estimate_and_forecast(cv_results[1:30, ])
+cv_results_new = estimate_and_forecast(cv_results)
 mae_table = calculate_mae_table(cv_results_new)
 
 mae_table
