@@ -442,8 +442,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # ind_baza_2018.xlsx ----
-# TODO: ссылка не работает!! Доступ запрещен
-url_from = "https://rosstat.gov.ru/storage/mediabank/H1EwGY8H/ind_baza-2018.xlsx"
+url_from = "https://rosstat.gov.ru/storage/mediabank/BYkjy3Bn/Ind_sub-2018.xls"
 raw_path_to = "ind_baza_2018.xlsx"
 csv_path_to = "ind_baza_2018.csv"
 univariate = FALSE
