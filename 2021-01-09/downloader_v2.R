@@ -40,7 +40,6 @@ extra = "-L" # options for downloading files, passed to `download.file()`: used 
 
 # i_ipc.xlsx ----
 url_from = "https://rosstat.gov.ru/storage/mediabank/tv8lQLMJ/i_ipc.xlsx"
-# TODO: link does not work!!! Доступ запрещен :( (Done)
 raw_path_to = "i_ipc.xlsx"
 csv_path_to = "i_ipc.csv"
 univariate = TRUE
@@ -159,7 +158,6 @@ if (file.exists(raw_path_to_full)) {
 
 
 # lendrate.html ----
-# TODO: скачивать все даты!!! (Done)
 url_from = "http://www.cbr.ru/hd_base/mkr/mkr_monthes/?UniDbQuery.Posted=True&UniDbQuery.From=08.2000&UniDbQuery.To=01.2100&UniDbQuery.st=SF&UniDbQuery.st=HR&UniDbQuery.st=MB&UniDbQuery.Currency=-1&UniDbQuery.sk=Dd1_&UniDbQuery.sk=Dd7&UniDbQuery.sk=Dd30&UniDbQuery.sk=Dd90&UniDbQuery.sk=Dd180&UniDbQuery.sk=Dd360"
 raw_path_to = "lendrate.html"
 csv_path_to = "lendrate.csv"
@@ -329,7 +327,6 @@ if (file.exists(raw_path_to_full)) {
 
 
 # reserves.html ----
-# TODO: скачивать все даты!!! Сейчас только с 2019 (done)
 url_from = "http://www.cbr.ru/hd_base/mrrf/mrrf_m/?UniDbQuery.Posted=True&UniDbQuery.From=01.1900&UniDbQuery.To=01.2021"
 raw_path_to = "reserves.html"
 csv_path_to = "reserves.csv"
