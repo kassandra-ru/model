@@ -221,7 +221,7 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
   warning("Probably file moved to another location")
   stop("Fucking `Access denied` inside a file :(")
 }
-data_processed = convert_1_nn_doc(raw_path_to_full, access_date)
+data_processed = convert_1_nn_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 if (file.exists(raw_path_to_full)) {
   file.remove(raw_path_to_full)
@@ -251,7 +251,7 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
   warning("Probably file moved to another location")
   stop("Fucking `Access denied` inside a file :(")
 }
-data_processed = convert_1_nn_doc(raw_path_to_full, access_date)
+data_processed = convert_1_nn_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 if (file.exists(raw_path_to_full)) {
   file.remove(raw_path_to_full)
@@ -281,7 +281,7 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
   warning("Probably file moved to another location")
   stop("Fucking `Access denied` inside a file :(")
 }
-data_processed = convert_1_nn_doc(raw_path_to_full, access_date)
+data_processed = convert_1_nn_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 if (file.exists(raw_path_to_full)) {
   file.remove(raw_path_to_full)
