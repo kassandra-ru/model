@@ -205,40 +205,10 @@ if (file.exists(raw_path_to_full)) {
 
 
 
-# 1-08.doc ----
-url_from = "http://www.gks.ru/bgd/regl/b18_02/IssWWW.exe/Stg/d010/1-08.doc"
-raw_path_to = "1-08.doc"
-csv_path_to = "1-08.csv"
-univariate = TRUE
-frequency = 12
-comment = "Agricultural index"
-
-csv_path_to_full = paste0(today_folder, csv_path_to)
-raw_path_to_full = paste0(today_folder, raw_path_to)
-
-utils::download.file(url = url_from, destfile = raw_path_to_full, method = method, extra = extra)
-if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) > 0) {
-  warning("Probably file moved to another location")
-  stop("Fucking `Access denied` inside a file :(")
-}
-data_processed = convert_1_nn_doc(raw_path_to_full, access_date)
-export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
-
-
-
-
-
-
-
-
-
-# 1-03.doc ----
-url_from = "http://www.gks.ru/bgd/regl/b18_02/IssWWW.exe/Stg/d010/1-03.doc"
-raw_path_to = "1-03.doc"
-csv_path_to = "1-03.csv"
+# 1-07.xlsx ----
+url_from = "https://www.gks.ru/bgd/regl/b20_02/IssWWW.exe/Stg/d010/1-07.xlsx"
+raw_path_to = "1-07.xlsx"
+csv_path_to = "1-07.csv"
 univariate = TRUE
 frequency = 12
 comment = "Construction"
@@ -265,9 +235,39 @@ if (file.exists(raw_path_to_full)) {
 
 
 
-# 1-11.doc ----
-url_from = "http://www.gks.ru/bgd/regl/b18_02/IssWWW.exe/Stg/d010/1-11.doc"
-raw_path_to = "1-11.doc"
+# 1-03.xlsx ----
+url_from = "https://www.gks.ru/bgd/regl/b20_02/IssWWW.exe/Stg/d010/1-03.xlsx"
+raw_path_to = "1-03.xlsx"
+csv_path_to = "1-03.csv"
+univariate = TRUE
+frequency = 12
+comment = "Agriculture index"
+
+csv_path_to_full = paste0(today_folder, csv_path_to)
+raw_path_to_full = paste0(today_folder, raw_path_to)
+
+utils::download.file(url = url_from, destfile = raw_path_to_full, method = method, extra = extra)
+if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) > 0) {
+  warning("Probably file moved to another location")
+  stop("Fucking `Access denied` inside a file :(")
+}
+data_processed = convert_1_nn_doc(raw_path_to_full, access_date)
+export_with_safe_date(data_processed, csv_path_to_full)
+if (file.exists(raw_path_to_full)) {
+  file.remove(raw_path_to_full)
+}
+
+
+
+
+
+
+
+
+
+# 1-11.xlsx ----
+url_from = "https://www.gks.ru/bgd/regl/b20_02/IssWWW.exe/Stg/d010/1-11.xlsx"
+raw_path_to = "1-11.xlsx"
 csv_path_to = "1-11.csv"
 univariate = TRUE
 frequency = 12
