@@ -39,8 +39,7 @@ method = "curl" # maybe "curl", "wget", "libcurl", "auto", "internal", "wininet"
 extra = "-L" # options for downloading files, passed to `download.file()`: used for "wget" and "curl" methods
 
 # i_ipc.xlsx ----
-url_from = "https://rosstat.gov.ru/storage/mediabank/tv8lQLMJ/i_ipc.xlsx"
-# TODO: link does not work!!! Доступ запрещен :( (Done)
+url_from = "https://rosstat.gov.ru/storage/mediabank/pddei1ud/i_ipc.xlsx"
 raw_path_to = "i_ipc.xlsx"
 csv_path_to = "i_ipc.csv"
 univariate = TRUE
