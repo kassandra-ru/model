@@ -440,8 +440,8 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 # ind_baza_2018.xlsx ----
 # TODO: ссылка не работает!! Доступ запрещен
-url_from = "https://rosstat.gov.ru/storage/mediabank/H1EwGY8H/ind_baza-2018.xlsx"
-raw_path_to = "ind_baza_2018.xlsx"
+url_from = "https://rosstat.gov.ru/storage/mediabank/BYkjy3Bn/Ind_sub-2018.xls"
+raw_path_to = "ind_baza_2018.xls"
 csv_path_to = "ind_baza_2018.csv"
 univariate = FALSE
 frequency = NA
@@ -455,7 +455,7 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
   warning("Probably file moved to another location")
   stop("Fucking `Access denied` inside a file :(")
 }
-data_processed = convert_ind_okved2_xlsx(raw_path_to_full, access_date)
+data_processed = convert_ind_okved2_xls(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 if (file.exists(raw_path_to_full)) {
   file.remove(raw_path_to_full)
