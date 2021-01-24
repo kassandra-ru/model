@@ -1,5 +1,5 @@
 # update package if necessary ----
-# devtools::install_github("kassandra-ru/kassandr")
+devtools::install_github("kassandra-ru/kassandr")
 
 
 # load packages ----
@@ -39,7 +39,7 @@ method = "curl" # maybe "curl", "wget", "libcurl", "auto", "internal", "wininet"
 extra = "-L" # options for downloading files, passed to `download.file()`: used for "wget" and "curl" methods
 
 # i_ipc.xlsx ----
-url_from = "https://rosstat.gov.ru/storage/mediabank/pddei1ud/i_ipc.xlsx"
+url_from = "https://rosstat.gov.ru/storage/mediabank/tv8lQLMJ/i_ipc.xlsx"
 raw_path_to = "i_ipc.xlsx"
 csv_path_to = "i_ipc.csv"
 univariate = TRUE
@@ -62,7 +62,7 @@ if (file.exists(raw_path_to_full)) {
 
 
 # tab5a.xls ----
-url_from = "https://gks.ru/storage/mediabank/e6uKSphi/tab5a.xls"
+url_from = "http://www.gks.ru/free_doc/new_site/vvp/kv/tab5a.xls"
 raw_path_to = "tab5a.xls"
 csv_path_to = "tab5a.csv"
 univariate = TRUE
@@ -223,6 +223,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_1_nn_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
+
+
+
 if (file.exists(raw_path_to_full)) {
   file.remove(raw_path_to_full)
 }
@@ -438,9 +441,10 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 
-# ind_baza_2018.xls ----
-url_from = "https://rosstat.gov.ru/storage/mediabank/BYkjy3Bn/Ind_sub-2018.xls"
-raw_path_to = "Ind_sub-2018.xls"
+# ind_baza_2018.xlsx ----
+# TODO: ссылка не работает!! Доступ запрещен
+url_from = "https://rosstat.gov.ru/storage/mediabank/H1EwGY8H/ind_baza-2018.xlsx"
+raw_path_to = "ind_baza_2018.xlsx"
 csv_path_to = "ind_baza_2018.csv"
 univariate = FALSE
 frequency = NA
@@ -454,17 +458,11 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
   warning("Probably file moved to another location")
   stop("Fucking `Access denied` inside a file :(")
 }
-data_processed = convert_ind_okved2_xls(raw_path_to_full, access_date)
+data_processed = convert_ind_okved2_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 if (file.exists(raw_path_to_full)) {
   file.remove(raw_path_to_full)
 }
-
-
-
-
-
-
 
 
 
