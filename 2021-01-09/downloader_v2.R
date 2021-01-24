@@ -62,7 +62,7 @@ if (file.exists(raw_path_to_full)) {
 
 
 # tab5a.xls ----
-url_from = "http://www.gks.ru/free_doc/new_site/vvp/kv/tab5a.xls"
+url_from = "https://gks.ru/storage/mediabank/e6uKSphi/tab5a.xls"
 raw_path_to = "tab5a.xls"
 csv_path_to = "tab5a.csv"
 univariate = TRUE
@@ -454,7 +454,7 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
   warning("Probably file moved to another location")
   stop("Fucking `Access denied` inside a file :(")
 }
-data_processed = convert_ind_okved2_xlsx(raw_path_to_full, access_date)
+data_processed = convert_ind_okved2_xls(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 if (file.exists(raw_path_to_full)) {
   file.remove(raw_path_to_full)
