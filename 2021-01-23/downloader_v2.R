@@ -1,5 +1,5 @@
 # update package if necessary ----
-# devtools::install_github("kassandra-ru/kassandr")
+#devtools::install_github("kassandra-ru/kassandr")
 
 
 # load packages ----
@@ -40,6 +40,7 @@ extra = "-L" # options for downloading files, passed to `download.file()`: used 
 
 # i_ipc.xlsx ----
 url_from = "https://rosstat.gov.ru/storage/mediabank/tv8lQLMJ/i_ipc.xlsx"
+
 raw_path_to = "i_ipc.xlsx"
 csv_path_to = "i_ipc.csv"
 univariate = TRUE
@@ -56,9 +57,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_i_ipc_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 # tab5a.xls ----
@@ -79,9 +80,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_tab5a_xls(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -103,9 +104,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_tab9a_xls(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 # tab9.xls ----
@@ -126,9 +127,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_tab9_xls(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -151,9 +152,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_tab6b_xls(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -175,9 +176,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_lendrate(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -199,9 +200,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_urov_12kv_doc(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -223,9 +224,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_1_nn_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -253,12 +254,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_1_nn_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
-
-
-
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -283,9 +281,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_1_nn_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -313,9 +311,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_m2_m2_sa_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+ # file.remove(raw_path_to_full)
+#}
 
 
 
@@ -344,9 +342,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_reserves(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -369,9 +367,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_ind_okved2_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -394,9 +392,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_trade_xls(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -419,9 +417,9 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_1_06_0_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
 
 
@@ -457,7 +455,7 @@ if (length(grep("Доступ запрещен", read_lines(raw_path_to_full))) 
 }
 data_processed = convert_ind_okved2_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
-if (file.exists(raw_path_to_full)) {
-  file.remove(raw_path_to_full)
-}
+#if (file.exists(raw_path_to_full)) {
+#  file.remove(raw_path_to_full)
+#}
 
