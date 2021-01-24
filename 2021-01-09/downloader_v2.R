@@ -62,7 +62,7 @@ if (file.exists(raw_path_to_full)) {
 
 
 # tab5a.xls ----
-url_from = "http://www.gks.ru/free_doc/new_site/vvp/kv/tab5a.xls"
+url_from = "https://gks.ru/storage/mediabank/e6uKSphi/tab5a.xls"
 raw_path_to = "tab5a.xls"
 csv_path_to = "tab5a.csv"
 univariate = TRUE
