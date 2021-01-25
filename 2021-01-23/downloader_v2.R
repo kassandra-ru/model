@@ -135,7 +135,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # tab6b.xls ----
-url_from = "http://www.gks.ru/free_doc/new_site/vvp/kv/tab6b.xls"
+url_from = "https://gks.ru/storage/mediabank/35KdpOvs/tab6b.xls"
 raw_path_to = "tab6b.xls"
 csv_path_to = "tab6b.csv"
 univariate = TRUE
