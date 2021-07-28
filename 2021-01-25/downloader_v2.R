@@ -1,5 +1,5 @@
 # update package if necessary ----
-devtools::install_github("kassandra-ru/kassandr", force = TRUE)
+devtools::install_github("kassandra-ru/kassandr")
 
 
 # load packages ----
