@@ -27,10 +27,14 @@ if (info[1] == "Windows") {
 
 
 simple_check_file = function(file) {
-  # TODO:
-  # проверить, что эксель по формату = эксель по содержанию
-  # ворд по формату = ворд по содержанию
-  #
+  if (str_detect(file, ".xlsx$") | str_detect(file, ".xls$")) {
+    res = try(readxl::read_excel(file))
+    if ('try-error' %in% class(res)) {
+      stop('The file ', file, ' is not a honest excel file!!!')
+    }
+  }
+
+  # more simple checks are better!!!
 
   return('OK')
 }
@@ -69,6 +73,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # tab5a.xls ----
+# 2021-07-30, boris, works fine
 url_from = "https://gks.ru/storage/mediabank/e6uKSphi/tab5a.xls"
 raw_path_to = "tab5a.xls"
 csv_path_to = "tab5a.csv"
@@ -90,6 +95,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # tab9a.xls ----
+# 2021-07-30, boris, works fine
 url_from = "http://www.gks.ru/free_doc/new_site/vvp/kv/tab9a.xls"
 raw_path_to = "tab9a.xls"
 csv_path_to = "tab9a.csv"
@@ -110,6 +116,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # tab9.xls ----
+# 2021-07-30, boris, works fine
 url_from = "http://www.gks.ru/free_doc/new_site/vvp/kv/tab9.xls"
 raw_path_to = "tab9.xls"
 csv_path_to = "tab9.csv"
@@ -132,6 +139,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # tab6b.xls ----
+# 2021-07-30, boris, works fine
 # previous file name was tab6b, so we use it as local file name
 url_from = "https://rosstat.gov.ru/storage/mediabank/5jmJa164/%D0%92%D0%92%D0%9F%20%D0%BA%D0%B2%D0%B0%D1%80%D1%82%D0%B0%D0%BB%D1%8B%20(%D1%81%201995%20%D0%B3.).xls"
 raw_path_to = "tab6b.xls"
@@ -154,6 +162,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # lendrate.html ----
+# 2021-07-30, boris, works fine
 url_from = "http://www.cbr.ru/hd_base/mkr/mkr_monthes/?UniDbQuery.Posted=True&UniDbQuery.From=08.2000&UniDbQuery.To=01.2100&UniDbQuery.st=SF&UniDbQuery.st=HR&UniDbQuery.st=MB&UniDbQuery.Currency=-1&UniDbQuery.sk=Dd1_&UniDbQuery.sk=Dd7&UniDbQuery.sk=Dd30&UniDbQuery.sk=Dd90&UniDbQuery.sk=Dd180&UniDbQuery.sk=Dd360"
 raw_path_to = "lendrate.html"
 csv_path_to = "lendrate.csv"
@@ -175,6 +184,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # urov_12kv.doc ----
+# 2021-07-30, boris, works fine
 url_from = "http://www.gks.ru/free_doc/new_site/population/urov/urov_12kv.doc"
 raw_path_to = "urov_12kv.doc"
 csv_path_to = "urov_12kv.csv"
@@ -196,6 +206,8 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # 1-07.xlsx ----
+# 2021-07-30, boris, works fine
+# 2021-07-30, boris, last observation: 2020-12 (! TODO: new source)
 url_from = "https://www.gks.ru/bgd/regl/b20_02/IssWWW.exe/Stg/d010/1-07.xlsx"
 raw_path_to = "1-07.xlsx"
 csv_path_to = "1-07.csv"
@@ -223,6 +235,8 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # 1-03.xlsx ----
+# 2021-07-30, boris, works fine
+# 2021-07-30, boris, last observation: 2020-12 (! TODO: new source)
 url_from = "https://www.gks.ru/bgd/regl/b20_02/IssWWW.exe/Stg/d010/1-03.xlsx"
 raw_path_to = "1-03.xlsx"
 csv_path_to = "1-03.csv"
@@ -243,6 +257,8 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # 1-11.xlsx ----
+# 2021-07-30, boris, works fine
+# 2021-07-30, boris, last observation: 2020-12 (! TODO: new source)
 url_from = "https://www.gks.ru/bgd/regl/b20_02/IssWWW.exe/Stg/d010/1-11.xlsx"
 raw_path_to = "1-11.xlsx"
 csv_path_to = "1-11.csv"
@@ -265,6 +281,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # m2-m2_sa.xlsx ----
+# 2021-07-30, boris, works fine
 url_from = "http://www.cbr.ru/vfs/statistics/credit_statistics/M2-M2_SA.xlsx"
 raw_path_to = "m2-m2_sa.xlsx"
 csv_path_to = "m2-m2_sa.csv"
@@ -285,6 +302,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # reserves.html ----
+# 2021-07-30, boris, works fine
 url_from = "http://www.cbr.ru/hd_base/mrrf/mrrf_m/?UniDbQuery.Posted=True&UniDbQuery.From=01.1900&UniDbQuery.To=01.2021"
 raw_path_to = "reserves.html"
 csv_path_to = "reserves.csv"
@@ -307,6 +325,8 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # ind_okved2.xlsx ----
+# 2021-07-30, boris, works fine
+# 2021-07-30, boris, last observation: 2019-07 (! TODO: new source)
 url_from = "http://www.gks.ru/free_doc/new_site/business/prom/ind_okved2.xlsx"
 raw_path_to = "ind_okved2.xlsx"
 csv_path_to = "ind_okved2.csv"
@@ -319,13 +339,15 @@ raw_path_to_full = paste0(today_folder, raw_path_to)
 
 utils::download.file(url = url_from, destfile = raw_path_to_full, method = method, extra = extra)
 simple_check_file(raw_path_to_full)
-data_processed = convert_ind_okved2_xls(raw_path_to_full, access_date)
+data_processed = convert_ind_okved2_xlsx(raw_path_to_full, access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 #if (file.exists(raw_path_to_full)) {
 #  file.remove(raw_path_to_full)
 #}
 
+
 # trade.xls ----
+# 2021-07-30, boris, works fine
 url_from = "https://www.cbr.ru/vfs/statistics/credit_statistics/trade/trade.xls"
 raw_path_to = "trade.xls"
 csv_path_to = "trade.csv"
@@ -348,6 +370,8 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # 1-06-0.xlsx ----
+# 2021-07-30, boris, works fine
+# 2021-07-30, boris, last observation: 2020-q3 (! TODO: new source)
 url_from = "http://www.gks.ru/bgd/regl/b20_02/IssWWW.exe/Stg/d010/1-06-0.xlsx"
 raw_path_to = "1-06-0.xlsx"
 csv_path_to = "invest.csv"
@@ -369,6 +393,7 @@ export_with_safe_date(data_processed, csv_path_to_full)
 
 
 # exchangerate.csv ----
+# 2021-07-30, boris, works fine
 csv_path_to = "exchangerate.csv"
 univariate = TRUE
 frequency = NA
@@ -376,14 +401,16 @@ comment = "NA Exchange rate from cbr"
 
 csv_path_to_full = paste0(today_folder, csv_path_to)
 
-data_processed = parse_exchangerate(access_date)
+data_processed = parse_exchangerate(access_date = access_date)
 export_with_safe_date(data_processed, csv_path_to_full)
 
 
 
 # ind_baza_2018.xls ----
-url_from = "https://rosstat.gov.ru/storage/mediabank/BYkjy3Bn/Ind_sub-2018.xls"
-raw_path_to = "Ind-sub-2018.xls"
+# 2021-07-30, boris, works fine
+# 2021-07-30, boris, old link removed "https://rosstat.gov.ru/storage/mediabank/BYkjy3Bn/Ind_sub-2018.xls"
+url_from = "https://rosstat.gov.ru/storage/mediabank/H0x7tnhK/ind-baza-2018.xlsx"
+raw_path_to = "ind-baza-2018.xlsx"
 csv_path_to = "ind_baza_2018.csv"
 univariate = FALSE
 frequency = NA
