@@ -9,8 +9,8 @@ library(ranger) # random forest
 library(progressr) # чтобы слайдер был :)
 library(rlang) # шаманство с бум-бум!
 
-devtools::install_github("kassandra-ru/kassandr") # если пакет не изменялся, установки не будет :)
-library(kassandr)
+# devtools::install_github("kassandra-ru/kassandr") # если пакет не изменялся, установки не будет :)
+# library(kassandr) # we avoid using kassandra here!
 
 
 
@@ -45,27 +45,35 @@ cv_folds = slide_tsibble(rus_m_full_stable, .size = window_size, .step = 1)
 
 # h_all = 1:6
 
-models = with_progress( # чтобы веселее ждать, можно и без индикатора прогресса :)
+# with_progress — чтобы веселее ждать, можно и без индикатора прогресса :)
+models = with_progress(
     model(cv_folds,
                ets = ETS(cpi),
                naive = NAIVE(cpi),
                snaive = SNAIVE(cpi),
                arima_auto = ARIMA(cpi),
-               arima_101_101 = ARIMA(cpi ~ 1 + pdq(1, 0, 1) + PDQ(1, 0, 1))
+               arima_auto_log = ARIMA(log(cpi)),
+               arima_101_101 = ARIMA(cpi ~ 1 + pdq(1, 0, 1) + PDQ(1, 0, 1)),
+               arima_111_100 = ARIMA(cpi ~ 1 + pdq(1, 1, 1) + PDQ(1, 0, 0))
     )
 )
 
 fcsts = forecast(models, h = 6)
 
 # это шаманство просто добавляет значение h рядом с реальной датой,
-# чтобы потом можно было усреднять качество прогнозов не только по моделям, но и по моделям + горизонт
+# чтобы потом можно было усреднять качество прогнозов не только по моделям,
+# но и по моделям + горизонт
 fcsts = group_by(fcsts, .id, .model) %>% mutate(h = row_number()) %>% ungroup()
 
 accuracy_table_detailed = accuracy(fcsts, rus_m_full_stable, by = c('.model', 'h'))
 accuracy_table_gross = accuracy(fcsts, rus_m_full_stable, by = '.model')
 
-accuracy_table_detailed
+
 accuracy_table_gross
+
+# get top leaders for each slice
+accuracy_table_detailed %>% group_by(h) %>% slice_min(order_by = MAE, n = 3)
+
 
 # TODO: stopped here
 # real forecasting....
