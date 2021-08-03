@@ -53,7 +53,7 @@ writexl::write_xlsx(forecast_wide, "web_tables/forecast_gdp_wide.xlsx")
 #------------industrial production
 
 mae_table = import("estimation_results/mae_table_ind_prod.csv")
-mae_post = mutate(mae_table, h = case_when(h == 1 ~ "1 месяца", 
+mae_post = mutate(mae_table, h = case_when(h == 1 ~ "1 месяц", 
                                            h == 2 ~ "2 месяца",
                                            h == 3 ~ "3 месяца",
                                            h == 4 ~ "4 месяца",
@@ -75,23 +75,23 @@ writexl::write_xlsx(forecast_wide, "web_tables/forecast_ind_prod_wide.xlsx")
 
 #------------ GDP growth
 
-# 
-# 
-# mae_table = import("estimation_results/mae_table_investment.csv")
-# mae_post = mutate(mae_table, h = case_when(h == 1 ~ "1 ??????????????", 
-#                                            h == 2 ~ "2 ????????????????",
-#                                            h == 3 ~ "3 ????????????????",
-#                                            h == 4 ~ "4 ????????????????",
-#                                            h == 5 ~ "5 ??????????????????",
-#                                            h == 6 ~ "6 ??????????????????"), mae = round(mae, 4))
-# mae_wide = spread(mae_post, key = model_fun, value = mae)
-# writexl::write_xlsx(mae_wide, "web_tables/mae_investment_wide.xlsx")
-# 
-# 
-# forecast_table = import("estimation_results/forecasts_investment.csv")
-# forecast_post = mutate(forecast_table, point_forecast = round(point_forecast, 3)) %>% 
-#   mutate(date = date_to_string(date, freq = 4))
-# 
-# forecast_wide = spread(forecast_post, key = model_fun, value = point_forecast) %>% arrange(h) %>% select(-h)
-# writexl::write_xlsx(forecast_wide, "web_tables/forecast_investment.xlsx")
-# 
+
+
+mae_table = import("estimation_results/mae_table_investment.csv")
+mae_post = mutate(mae_table, h = case_when(h == 1 ~ "1 квартал", 
+                                           h == 2 ~ "2 квартала",
+                                           h == 3 ~ "3 квартала",
+                                           h == 4 ~ "4 квартала",
+                                           h == 5 ~ "5 кварталов",
+                                           h == 6 ~ "6 кварталов"), mae = round(mae, 4))
+mae_wide = spread(mae_post, key = model_fun, value = mae)
+writexl::write_xlsx(mae_wide, "web_tables/mae_investment_wide.xlsx")
+
+
+forecast_table = import("estimation_results/forecasts_investment.csv")
+forecast_post = mutate(forecast_table, point_forecast = round(point_forecast, 3)) %>% 
+  mutate(date = date_to_string(date, freq = 4))
+
+forecast_wide = spread(forecast_post, key = model_fun, value = point_forecast) %>% arrange(h) %>% select(-h)
+writexl::write_xlsx(forecast_wide, "web_tables/forecast_investment.xlsx")
+
